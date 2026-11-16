@@ -60,13 +60,13 @@ MODULES_FILE="${EXTRACT_DIR}/java_bundle-device/lib/modules"
 
 if [[ ! -s "${FRAMEWORK_DIR}/Info.plist" ]]; then
   echo "The pinned OpenJDK archive did not contain OpenJDK.xcframework/Info.plist." >&2
-  find "$EXTRACT_DIR" -maxdepth 4 -print | head -200
+  find "$EXTRACT_DIR" -maxdepth 4 -print | sed -n '1,200p'
   exit 1
 fi
 
 if [[ ! -s "$MODULES_FILE" ]]; then
   echo "The pinned Java bundle did not contain lib/modules." >&2
-  find "${EXTRACT_DIR}/java_bundle-device" -maxdepth 4 -print | head -200
+  find "${EXTRACT_DIR}/java_bundle-device" -maxdepth 4 -print | sed -n '1,200p'
   exit 1
 fi
 
