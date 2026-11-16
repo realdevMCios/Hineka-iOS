@@ -1,4 +1,5 @@
 import SwiftUI
+import HinekaJavaRuntime
 
 public struct LauncherRootView: View {
     public init() {}
@@ -36,6 +37,8 @@ public struct LauncherRootView: View {
 
 private struct HomeDashboardView: View {
     @AppStorage("hineka.selectedMinecraftVersion") private var selectedVersionID = ""
+    @State private var isTestingJavaRuntime = false
+    @State private var javaRuntimeOutput = "Chưa chạy kiểm tra Java."
 
     var body: some View {
         NavigationStack {
@@ -88,15 +91,39 @@ private struct HomeDashboardView: View {
                             .stroke(.quaternary, lineWidth: 1)
                     }
 
-                    VStack(alignment: .leading, spacing: 8) {
-                        Label("Runtime Java chưa được tích hợp", systemImage: "wrench.and.screwdriver")
+                    VStack(alignment: .leading, spacing: 10) {
+                        Label("OpenJDK Zero · thử nghiệm", systemImage: "terminal")
                             .font(.headline)
-                        Text("Đây là khung giao diện ban đầu. Nút khởi chạy sẽ được mở khi runtime, thư viện và quy trình cấp quyền đã được tích hợp và kiểm thử.")
+
+                        Text("Kiểm tra Java độc lập trước. Bài kiểm tra này chưa khởi chạy Minecraft.")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
+
+                        Button {
+                            runJavaRuntimeSmokeTest()
+                        } label: {
+                            if isTestingJavaRuntime {
+                                ProgressView()
+                                    .frame(maxWidth: .infinity)
+                            } else {
+                                Label("Thử chạy Java", systemImage: "play.fill")
+                                    .frame(maxWidth: .infinity)
+                            }
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(isTestingJavaRuntime)
+
+                        Text(javaRuntimeOutput)
+                            .font(.caption.monospaced())
+                            .textSelection(.enabled)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(10)
+                            .background(.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+
                         Button("Khởi chạy Minecraft") {}
-                            .buttonStyle(.borderedProminent)
+                            .buttonStyle(.bordered)
                             .disabled(true)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                     }
                     .padding(16)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -120,6 +147,18 @@ private struct HomeDashboardView: View {
                 .padding(16)
             }
             .navigationTitle("Hineka")
+        }
+    }
+
+    private func runJavaRuntimeSmokeTest() {
+        guard !isTestingJavaRuntime else { return }
+        isTestingJavaRuntime = true
+        defer { isTestingJavaRuntime = false }
+
+        do {
+            javaRuntimeOutput = try HinekaJavaRuntime.runSmokeTest()
+        } catch {
+            javaRuntimeOutput = "Java smoke test failed:\n" + error.localizedDescription
         }
     }
 }
