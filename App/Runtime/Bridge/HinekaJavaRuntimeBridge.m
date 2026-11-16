@@ -63,6 +63,12 @@ NSString * _Nullable HinekaJavaRunSmokeTest(
         YES
     );
     NSString *cacheRoot = cachePaths.firstObject;
+    if (cacheRoot.length == 0) {
+        if (error != NULL) {
+            *error = HinekaMakeRuntimeError(11, @"Could not locate the app cache directory.");
+        }
+        return nil;
+    }
     NSString *homePath = [cacheRoot stringByAppendingPathComponent:@"HinekaJavaHome"];
     NSString *tempPath = [cacheRoot stringByAppendingPathComponent:@"HinekaJavaTemp"];
 
@@ -142,7 +148,8 @@ NSString * _Nullable HinekaJavaRunSmokeTest(
 
     NSString *output = nil;
     jclass testClass = (*env)->FindClass(env, "HinekaRuntimeSmokeTest");
-    if (testClass == NULL || HinekaClearPendingException(env, @"FindClass", error)) {
+    BOOL findClassThrew = HinekaClearPendingException(env, @"FindClass", error);
+    if (testClass == NULL || findClassThrew) {
         if (testClass == NULL && error != NULL && *error == nil) {
             *error = HinekaMakeRuntimeError(6, @"Could not find HinekaRuntimeSmokeTest.");
         }
@@ -155,7 +162,8 @@ NSString * _Nullable HinekaJavaRunSmokeTest(
         "run",
         "()Ljava/lang/String;"
     );
-    if (runMethod == NULL || HinekaClearPendingException(env, @"GetStaticMethodID", error)) {
+    BOOL getMethodThrew = HinekaClearPendingException(env, @"GetStaticMethodID", error);
+    if (runMethod == NULL || getMethodThrew) {
         if (runMethod == NULL && error != NULL && *error == nil) {
             *error = HinekaMakeRuntimeError(7, @"Could not find the Java smoke-test method.");
         }
@@ -163,7 +171,8 @@ NSString * _Nullable HinekaJavaRunSmokeTest(
     }
 
     jstring javaOutput = (jstring)(*env)->CallStaticObjectMethod(env, testClass, runMethod);
-    if (javaOutput == NULL || HinekaClearPendingException(env, @"Java smoke test", error)) {
+    BOOL javaCallThrew = HinekaClearPendingException(env, @"Java smoke test", error);
+    if (javaOutput == NULL || javaCallThrew) {
         if (javaOutput == NULL && error != NULL && *error == nil) {
             *error = HinekaMakeRuntimeError(8, @"The Java smoke test returned no result.");
         }
@@ -171,7 +180,8 @@ NSString * _Nullable HinekaJavaRunSmokeTest(
     }
 
     const char *utf8Output = (*env)->GetStringUTFChars(env, javaOutput, NULL);
-    if (utf8Output == NULL || HinekaClearPendingException(env, @"GetStringUTFChars", error)) {
+    BOOL getStringThrew = HinekaClearPendingException(env, @"GetStringUTFChars", error);
+    if (utf8Output == NULL || getStringThrew) {
         if (utf8Output == NULL && error != NULL && *error == nil) {
             *error = HinekaMakeRuntimeError(9, @"Could not read the Java smoke-test result.");
         }
