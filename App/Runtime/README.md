@@ -7,7 +7,7 @@ This target is an **experimental device-side JVM smoke test**, not a Minecraft r
 - `SmokeTest/` contains a tiny Java class compiled by the CI bootstrap script.
 - `Swift/Resources/lib/modules` and `HinekaRuntimeSmokeTest.jar` are generated locally/inside CI and are not committed.
 
-The bootstrap script downloads only pinned public release artifacts and verifies their published SHA-256 digests before extracting them.
+The bootstrap script downloads only pinned public release artifacts and verifies their published SHA-256 digests before extracting them. It also compiles the Java smoke-test JAR as Java 17 bytecode and runs that JAR on the macOS build host before Xcode builds the iOS app.
 
 **Important limitations**
 - The pinned upstream snapshot is a prerelease and is older than the current ios-tools source tree.
