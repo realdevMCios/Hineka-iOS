@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "App/**"
+      - "Scripts/**"
       - "Package.swift"
       - "project.yml"
       - ".github/workflows/ios-build.yml"
@@ -12,6 +13,7 @@ on:
     branches: [main]
     paths:
       - "App/**"
+      - "Scripts/**"
       - "Package.swift"
       - "project.yml"
       - ".github/workflows/ios-build.yml"
@@ -21,15 +23,26 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build-ios-simulator:
-    timeout-minutes: 35
+  build-ios-device:
+    timeout-minutes: 45
     runs-on: macos-15
     steps:
       - name: Check out source
         uses: actions/checkout@v4
 
-      - name: Validate Swift package manifest
-        run: swift package dump-package
+      - name: Set up Java 26 for the smoke-test JAR
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "26"
+
+      - name: Prepare pinned OpenJDK Mobile runtime inputs
+        run: bash Scripts/prepare-openjdk-ios-runtime.sh
+
+      - name: Validate Swift package manifest and resolve dependencies
+        run: |
+          swift package dump-package
+          swift package resolve
 
       - name: Parse all Swift source files
         run: |
@@ -47,11 +60,11 @@ jobs:
       - name: Show Xcode version
         run: xcodebuild -version
 
-      - name: Build Hineka app for iOS Simulator
+      - name: Build Hineka for generic iOS device (unsigned)
         run: >-
           xcodebuild
           -project Hineka.xcodeproj
           -scheme Hineka
-          -destination 'generic/platform=iOS Simulator'
+          -destination 'generic/platform=iOS'
           CODE_SIGNING_ALLOWED=NO
           build
