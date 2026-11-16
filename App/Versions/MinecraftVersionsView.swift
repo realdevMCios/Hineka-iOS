@@ -30,8 +30,8 @@ private struct MinecraftVersion: Decodable, Identifiable {
     var isStableRelease: Bool { type == "release" }
 }
 
-/// Reads Mojang's public version manifest. Selecting a version only stores a launcher preference;
-/// downloading game files and launching Java are separate, not-yet-implemented stages.
+/// Reads Mojang's public version manifest and installs vanilla client/library/assets.
+/// Java runtime setup and the actual game-launch stage are still separate and not yet implemented.
 @MainActor
 private final class MinecraftVersionCatalog: ObservableObject {
     @Published private(set) var versions: [MinecraftVersion] = []
