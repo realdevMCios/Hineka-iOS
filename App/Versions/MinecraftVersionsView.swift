@@ -177,6 +177,9 @@ public struct MinecraftVersionsView: View {
                 if catalog.versions.isEmpty {
                     await catalog.refresh()
                 }
+                if selectedVersionID.isEmpty && !catalog.latestRelease.isEmpty {
+                    selectedVersionID = catalog.latestRelease
+                }
             }
         }
     }
