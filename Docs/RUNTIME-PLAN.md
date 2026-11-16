@@ -1,6 +1,6 @@
 # Hineka Java runtime and installation plan
 
-Status: architecture and integration plan. The vanilla downloader is implemented in the SwiftUI source package; the Java VM, iOS native libraries, renderer, and actual game launch are not implemented.
+Status: experimental Java smoke-test bridge is integrated in source; it has not yet been built successfully by Xcode or run on an iPhone/iPad. The full Minecraft-compatible Java runtime, iOS native libraries, renderer, and game launch are not implemented.
 
 ## Non-negotiable project boundaries
 - This is the separate **Hineka iOS** project. Do not modify `realdevMCios/test-script` or any other unrelated repository.
@@ -20,7 +20,7 @@ Status: architecture and integration plan. The vanilla downloader is implemented
 
 ## Runtime architecture
 1. **Version manifest and vanilla downloader** — implemented in this repository as an early first pass. It retrieves Mojang metadata, verifies the metadata SHA-1, downloads the selected client JAR, Maven Java library artifacts, asset index, and asset objects, then writes a Hineka installed marker.
-2. **Java runtime provider** — not implemented. Hineka needs a supported OpenJDK/JRE build for iOS arm64, correct Java major versions for selected Minecraft versions, and a documented no-JIT vs authorized-JIT strategy.
+2. **Java runtime provider** — an upstream OpenJDK Mobile Zero image and a minimal JNI smoke-test bridge are now wired into source. The app must still build and run on a physical device before this counts as a working runtime. A complete Minecraft-compatible JRE/module set for the selected Java major versions is not yet verified.
 3. **Native library layer** — not implemented. Minecraft libraries with Linux/macOS/Windows native classifiers cannot be treated as iOS binaries. Hineka needs specifically built iOS arm64-compatible native components and license review.
 4. **Graphics and input bridge** — not implemented. Define a renderer surface, OpenGL compatibility strategy, audio/input bridge, safe-area handling, touch controls, external keyboard/mouse, and controller support.
 5. **Launch profile and process supervisor** — not implemented. Build a classpath and JVM arguments from validated version metadata, apply profile-specific mods/resource packs, capture logs, support cancellation, and cleanly stop the Java process.
