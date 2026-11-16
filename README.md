@@ -16,13 +16,12 @@ Current development label: **0.1-dev** (not a release).
 
 | Top-up | Coins |
 |---:|---:|
-| 10,000 VND | 40 |
 | 20,000 VND | 90 |
-| 50,000 VND | 150 |
-| 100,000 VND | 700 |
+| 50,000 VND | 130 |
+| 100,000 VND | 200 |
 | 200,000 VND | 500 |
 | 500,000 VND | 900 |
-| 1,000,000 VND | 1,500 |
+| 1,000,000 VND | 1,800 |
 
 Requested card brands: Viettel, MobiFone, and Zing. They are **not integrated**. Purchase controls remain disabled until a lawful payment route, provider account, and server verification are in place.
 
