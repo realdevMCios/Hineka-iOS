@@ -5,56 +5,42 @@
 
 extern void loadfunctions(void);
 
-static NSString * const HinekaJavaRuntimeErrorDomain = @"com.realdevmcios.hineka.java-runtime";
+static NSString *g_hinekaJavaLastError = nil;
 
-static NSError *HinekaMakeRuntimeError(NSInteger code, NSString *message) {
-    return [NSError errorWithDomain:HinekaJavaRuntimeErrorDomain
-                               code:code
-                           userInfo:@{ NSLocalizedDescriptionKey: message }];
+static NSString *HinekaSetRuntimeError(NSString *message) {
+    g_hinekaJavaLastError = [message copy];
+    return nil;
 }
 
-static BOOL HinekaClearPendingException(JNIEnv *env, NSString *stage, NSError **error) {
+static BOOL HinekaClearPendingException(JNIEnv *env, NSString *stage) {
     if (!(*env)->ExceptionCheck(env)) {
         return NO;
     }
 
     (*env)->ExceptionDescribe(env);
     (*env)->ExceptionClear(env);
-
-    if (error != NULL) {
-        *error = HinekaMakeRuntimeError(20, [NSString stringWithFormat:@"Java exception at %@.", stage]);
-    }
+    g_hinekaJavaLastError = [NSString stringWithFormat:@"Java exception at %@.", stage];
     return YES;
 }
 
 NSString * _Nullable HinekaJavaRunSmokeTest(
     NSString *javaHomePath,
-    NSString *classPath,
-    NSError **error
+    NSString *classPath
 ) {
+    g_hinekaJavaLastError = nil;
+
     if (![NSThread isMainThread]) {
-        if (error != NULL) {
-            *error = HinekaMakeRuntimeError(1, @"The experimental JVM smoke test must run on the main thread.");
-        }
-        return nil;
+        return HinekaSetRuntimeError(@"The experimental JVM smoke test must run on the main thread.");
     }
 
     if (javaHomePath.length == 0 || classPath.length == 0) {
-        if (error != NULL) {
-            *error = HinekaMakeRuntimeError(2, @"Missing Java home or smoke-test JAR path.");
-        }
-        return nil;
+        return HinekaSetRuntimeError(@"Missing Java home or smoke-test JAR path.");
     }
 
     NSString *modulesPath = [javaHomePath stringByAppendingPathComponent:@"lib/modules"];
-    NSString *jarPath = classPath;
-
     if (![[NSFileManager defaultManager] fileExistsAtPath:modulesPath] ||
-        ![[NSFileManager defaultManager] fileExistsAtPath:jarPath]) {
-        if (error != NULL) {
-            *error = HinekaMakeRuntimeError(3, @"The bundled Java modules image or smoke-test JAR is missing.");
-        }
-        return nil;
+        ![[NSFileManager defaultManager] fileExistsAtPath:classPath]) {
+        return HinekaSetRuntimeError(@"The bundled Java modules image or smoke-test JAR is missing.");
     }
 
     NSArray<NSString *> *cachePaths = NSSearchPathForDirectoriesInDomains(
@@ -64,11 +50,9 @@ NSString * _Nullable HinekaJavaRunSmokeTest(
     );
     NSString *cacheRoot = cachePaths.firstObject;
     if (cacheRoot.length == 0) {
-        if (error != NULL) {
-            *error = HinekaMakeRuntimeError(11, @"Could not locate the app cache directory.");
-        }
-        return nil;
+        return HinekaSetRuntimeError(@"Could not locate the app cache directory.");
     }
+
     NSString *homePath = [cacheRoot stringByAppendingPathComponent:@"HinekaJavaHome"];
     NSString *tempPath = [cacheRoot stringByAppendingPathComponent:@"HinekaJavaTemp"];
 
@@ -84,14 +68,11 @@ NSString * _Nullable HinekaJavaRunSmokeTest(
                                                         error:&directoryError];
     }
     if (directoryError != nil) {
-        if (error != NULL) {
-            *error = directoryError;
-        }
-        return nil;
+        return HinekaSetRuntimeError(directoryError.localizedDescription);
     }
 
     NSString *javaHomeOption = [@"-Djava.home=" stringByAppendingString:javaHomePath];
-    NSString *classPathOption = [@"-Djava.class.path=" stringByAppendingString:jarPath];
+    NSString *classPathOption = [@"-Djava.class.path=" stringByAppendingString:classPath];
     NSString *userHomeOption = [@"-Duser.home=" stringByAppendingString:homePath];
     NSString *tempOption = [@"-Djava.io.tmpdir=" stringByAppendingString:tempPath];
 
@@ -111,10 +92,7 @@ NSString * _Nullable HinekaJavaRunSmokeTest(
             for (NSUInteger freeIndex = 0; freeIndex < index; freeIndex++) {
                 free(options[freeIndex].optionString);
             }
-            if (error != NULL) {
-                *error = HinekaMakeRuntimeError(4, @"Could not allocate Java VM options.");
-            }
-            return nil;
+            return HinekaSetRuntimeError(@"Could not allocate Java VM options.");
         }
     }
 
@@ -137,21 +115,17 @@ NSString * _Nullable HinekaJavaRunSmokeTest(
     }
 
     if (createResult != JNI_OK || javaVM == NULL || env == NULL) {
-        if (error != NULL) {
-            *error = HinekaMakeRuntimeError(
-                5,
-                [NSString stringWithFormat:@"JNI_CreateJavaVM failed (status %d).", (int)createResult]
-            );
-        }
-        return nil;
+        return HinekaSetRuntimeError(
+            [NSString stringWithFormat:@"JNI_CreateJavaVM failed (status %d).", (int)createResult]
+        );
     }
 
     NSString *output = nil;
     jclass testClass = (*env)->FindClass(env, "HinekaRuntimeSmokeTest");
-    BOOL findClassThrew = HinekaClearPendingException(env, @"FindClass", error);
+    BOOL findClassThrew = HinekaClearPendingException(env, @"FindClass");
     if (testClass == NULL || findClassThrew) {
-        if (testClass == NULL && error != NULL && *error == nil) {
-            *error = HinekaMakeRuntimeError(6, @"Could not find HinekaRuntimeSmokeTest.");
+        if (testClass == NULL && g_hinekaJavaLastError == nil) {
+            g_hinekaJavaLastError = @"Could not find HinekaRuntimeSmokeTest.";
         }
         goto cleanup;
     }
@@ -162,48 +136,51 @@ NSString * _Nullable HinekaJavaRunSmokeTest(
         "run",
         "()Ljava/lang/String;"
     );
-    BOOL getMethodThrew = HinekaClearPendingException(env, @"GetStaticMethodID", error);
+    BOOL getMethodThrew = HinekaClearPendingException(env, @"GetStaticMethodID");
     if (runMethod == NULL || getMethodThrew) {
-        if (runMethod == NULL && error != NULL && *error == nil) {
-            *error = HinekaMakeRuntimeError(7, @"Could not find the Java smoke-test method.");
+        if (runMethod == NULL && g_hinekaJavaLastError == nil) {
+            g_hinekaJavaLastError = @"Could not find the Java smoke-test method.";
         }
         goto cleanup;
     }
 
     jstring javaOutput = (jstring)(*env)->CallStaticObjectMethod(env, testClass, runMethod);
-    BOOL javaCallThrew = HinekaClearPendingException(env, @"Java smoke test", error);
+    BOOL javaCallThrew = HinekaClearPendingException(env, @"Java smoke test");
     if (javaOutput == NULL || javaCallThrew) {
-        if (javaOutput == NULL && error != NULL && *error == nil) {
-            *error = HinekaMakeRuntimeError(8, @"The Java smoke test returned no result.");
+        if (javaOutput == NULL && g_hinekaJavaLastError == nil) {
+            g_hinekaJavaLastError = @"The Java smoke test returned no result.";
         }
         goto cleanup;
     }
 
     const char *utf8Output = (*env)->GetStringUTFChars(env, javaOutput, NULL);
-    BOOL getStringThrew = HinekaClearPendingException(env, @"GetStringUTFChars", error);
+    BOOL getStringThrew = HinekaClearPendingException(env, @"GetStringUTFChars");
     if (utf8Output == NULL || getStringThrew) {
-        if (utf8Output == NULL && error != NULL && *error == nil) {
-            *error = HinekaMakeRuntimeError(9, @"Could not read the Java smoke-test result.");
+        if (utf8Output == NULL && g_hinekaJavaLastError == nil) {
+            g_hinekaJavaLastError = @"Could not read the Java smoke-test result.";
         }
         goto cleanup;
     }
 
     output = [NSString stringWithUTF8String:utf8Output];
     (*env)->ReleaseStringUTFChars(env, javaOutput, utf8Output);
+    if (output == nil && g_hinekaJavaLastError == nil) {
+        g_hinekaJavaLastError = @"The Java smoke-test result was not valid UTF-8.";
+    }
 
 cleanup:
     {
         jint destroyResult = (*javaVM)->DestroyJavaVM(javaVM);
         if (destroyResult != JNI_OK && output != nil) {
-            if (error != NULL) {
-                *error = HinekaMakeRuntimeError(
-                    10,
-                    [NSString stringWithFormat:@"Java VM shutdown returned status %d.", (int)destroyResult]
-                );
-            }
+            g_hinekaJavaLastError = [NSString stringWithFormat:
+                @"Java VM shutdown returned status %d.", (int)destroyResult];
             output = nil;
         }
     }
 
     return output;
+}
+
+NSString * _Nullable HinekaJavaLastError(void) {
+    return g_hinekaJavaLastError;
 }
