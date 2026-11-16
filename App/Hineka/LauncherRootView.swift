@@ -8,12 +8,12 @@ struct LauncherRootView: View {
                     Label("Trang chủ", systemImage: "house.fill")
                 }
 
-            VersionsView()
+            MinecraftVersionsView()
                 .tabItem {
                     Label("Phiên bản", systemImage: "square.stack.3d.up")
                 }
 
-            ModCatalogView()
+            LocalLibraryView()
                 .tabItem {
                     Label("Thư viện", systemImage: "shippingbox")
                 }
