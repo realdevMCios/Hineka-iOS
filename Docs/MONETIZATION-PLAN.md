@@ -11,21 +11,21 @@ Status: product specification only. The storefront, top-up gateway, and server-s
 
 ## Coin top-up catalogue
 
-The owner's corrected meaning is **top-up denomination in VND → Coins credited**:
+The owner's confirmed mapping is **top-up denomination in VND → Coins credited**:
 
 | Top-up denomination | Coins credited |
 |---:|---:|
 | 10,000 VND | 40 Coins |
 | 20,000 VND | 90 Coins |
 | 50,000 VND | 150 Coins |
-| 100,000 VND | **Not specified yet — disabled until confirmed** |
+| 100,000 VND | 1,700 Coins |
 | 200,000 VND | 500 Coins |
 | 500,000 VND | 900 Coins |
 | 1,000,000 VND | 1,500 Coins |
 
-- Do not invent the 100,000 VND package's Coin amount.
+- These are owner-approved draft catalogue values. They are not live payment products until each provider/store mapping and server verification are configured.
 - Show a package as purchasable only when its denomination, Coin grant, provider product/configuration, and server verification are all configured.
-- The table is a draft owner-provided catalogue, not proof that a provider pays out the full face value. Reconcile a submitted card against the provider's confirmed denomination/value before granting the mapped Coins.
+- Reconcile a submitted card against the provider's confirmed denomination/value before granting the mapped Coins.
 - Keep all balances in integer Coins; never use floating point for the ledger.
 
 ## Mod catalogue: Chinese Java mods
@@ -79,7 +79,6 @@ The owner's corrected meaning is **top-up denomination in VND → Coins credited
 - Follow applicable platform age, privacy, consumer-protection, payment, and tax rules.
 
 ## Pending owner decisions
-- [ ] Set the Coins granted for 100,000 VND.
 - [ ] Decide fixed 30-day Premium or auto-renewing 100,000 VND/month.
 - [ ] Select and vet a card-top-up provider; confirm its fees, payout rules, API status model, supported denominations, and contracts.
 - [ ] Confirm the actual distribution route for the iOS app: App Store, direct IPA, or separately configured builds.
