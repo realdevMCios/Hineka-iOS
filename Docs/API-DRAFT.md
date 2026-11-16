@@ -39,13 +39,12 @@ Returns current server-calculated Coin balance and latest ledger entries. Balanc
 
 ### GET /v1/catalog/coin-packages
 Returns enabled packages from the server. Current owner-approved draft:
-- 10,000 VND -> 40 Coins
 - 20,000 VND -> 90 Coins
-- 50,000 VND -> 150 Coins
-- 100,000 VND -> 700 Coins
+- 50,000 VND -> 130 Coins
+- 100,000 VND -> 200 Coins
 - 200,000 VND -> 500 Coins
 - 500,000 VND -> 900 Coins
-- 1,000,000 VND -> 1,500 Coins
+- 1,000,000 VND -> 1,800 Coins
 
 Do not return a package as purchasable until its payment route is enabled and its mapping is complete.
 
