@@ -128,9 +128,17 @@ public final class MinecraftVersionInstaller: ObservableObject {
         )) ?? []
 
         installedVersionIDs = Set(children.compactMap { directory in
-            let marker = directory.appendingPathComponent(".hineka-installed.json")
-            guard fileManager.fileExists(atPath: marker.path) else { return nil }
-            return directory.lastPathComponent
+            let markerURL = directory.appendingPathComponent(".hineka-installed.json")
+            let clientURL = directory.appendingPathComponent(directory.lastPathComponent + ".jar")
+            guard
+                let markerData = try? Data(contentsOf: markerURL),
+                let marker = try? JSONDecoder().decode(HinekaInstalledVersion.self, from: markerData),
+                marker.id == directory.lastPathComponent,
+                fileManager.fileExists(atPath: clientURL.path)
+            else {
+                return nil
+            }
+            return marker.id
         })
     }
 
