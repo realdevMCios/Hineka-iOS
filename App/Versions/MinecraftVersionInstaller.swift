@@ -40,11 +40,13 @@ struct MinecraftVersionMetadata: Decodable {
 
     struct LibraryDownloads: Decodable {
         let artifact: VerifiedDownload?
+        let classifiers: [String: VerifiedDownload]?
     }
 
     struct Library: Decodable {
         let name: String
         let downloads: LibraryDownloads?
+        let natives: [String: String]?
     }
 
     struct JavaVersion: Decodable {
