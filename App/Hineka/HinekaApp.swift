@@ -1,4 +1,5 @@
 import SwiftUI
+import HinekaUI
 
 @main
 struct HinekaApp: App {
