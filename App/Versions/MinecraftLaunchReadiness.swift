@@ -145,7 +145,7 @@ public enum MinecraftLaunchReadinessChecker {
             blockers.append("Thiếu Asset Index hoặc \(missingAssetCount) asset.")
         }
         if let javaMajorVersion = metadata.javaVersion?.majorVersion {
-            blockers.append("OpenJDK runtime Java \(javaMajorVersion) chưa được tích hợp vào app.")
+            blockers.append("OpenJDK Zero Java \(javaMajorVersion) chưa được xác minh trên thiết bị; cần chạy smoke-test và kiểm tra tương thích.")
         } else {
             blockers.append("Không xác định được phiên bản Java yêu cầu.")
         }
