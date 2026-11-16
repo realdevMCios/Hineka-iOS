@@ -42,7 +42,7 @@ Returns enabled packages from the server. Current owner-approved draft:
 - 10,000 VND -> 40 Coins
 - 20,000 VND -> 90 Coins
 - 50,000 VND -> 150 Coins
-- 100,000 VND -> not configured; omit from purchasable response
+- 100,000 VND -> 1,700 Coins
 - 200,000 VND -> 500 Coins
 - 500,000 VND -> 900 Coins
 - 1,000,000 VND -> 1,500 Coins
