@@ -13,7 +13,7 @@ struct LauncherRootView: View {
                     Label("Phiên bản", systemImage: "square.stack.3d.up")
                 }
 
-            ModsAndPacksView()
+            ModCatalogView()
                 .tabItem {
                     Label("Thư viện", systemImage: "shippingbox")
                 }
@@ -113,32 +113,6 @@ private struct VersionsView: View {
                 }
             }
             .navigationTitle("Phiên bản")
-        }
-    }
-}
-
-private struct ModsAndPacksView: View {
-    var body: some View {
-        NavigationStack {
-            List {
-                Section("Mods") {
-                    Label("Modrinth", systemImage: "shippingbox")
-                    Label("CurseForge", systemImage: "shippingbox")
-                    Label("Mod Trung Quốc", systemImage: "globe.asia.australia")
-                }
-
-                Section("Resource Packs") {
-                    Label("Tệp .zip trên thiết bị", systemImage: "folder")
-                    Text("Bật/tắt, sắp xếp và xem trước sẽ được bổ sung.")
-                        .foregroundStyle(.secondary)
-                }
-
-                Section("Quản lý") {
-                    Text("Chưa có trình nhập tệp, bộ quét hoặc hệ thống tương thích phiên bản.")
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .navigationTitle("Thư viện")
         }
     }
 }
