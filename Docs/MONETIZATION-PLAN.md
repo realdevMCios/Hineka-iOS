@@ -18,7 +18,7 @@ The owner's confirmed mapping is **top-up denomination in VND → Coins credited
 | 10,000 VND | 40 Coins |
 | 20,000 VND | 90 Coins |
 | 50,000 VND | 150 Coins |
-| 100,000 VND | 1,700 Coins |
+| 100,000 VND | 700 Coins |
 | 200,000 VND | 500 Coins |
 | 500,000 VND | 900 Coins |
 | 1,000,000 VND | 1,500 Coins |
