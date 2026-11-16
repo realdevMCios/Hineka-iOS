@@ -1,0 +1,4 @@
+.runtime-build/
+App/Runtime/Swift/Resources/lib/modules
+App/Runtime/Swift/Resources/HinekaRuntimeSmokeTest.jar
+App/Runtime/Swift/Resources/openjdk-runtime-manifest.txt
