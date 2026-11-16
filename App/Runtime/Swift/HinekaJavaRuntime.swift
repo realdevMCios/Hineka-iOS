@@ -39,14 +39,9 @@ public enum HinekaJavaRuntime {
             throw HinekaJavaRuntimeError.missingSmokeTestJar
         }
 
-        var nativeError: NSError?
-        guard let output = HinekaJavaRunSmokeTest(
-            resourceURL.path,
-            jarURL.path,
-            &nativeError
-        ) else {
+        guard let output = HinekaJavaRunSmokeTest(resourceURL.path, jarURL.path) else {
             throw HinekaJavaRuntimeError.javaStartupFailed(
-                nativeError?.localizedDescription ?? "Không khởi tạo được OpenJDK Zero."
+                HinekaJavaLastError() ?? "Không khởi tạo được OpenJDK Zero."
             )
         }
 
