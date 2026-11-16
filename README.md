@@ -19,7 +19,7 @@ Current development label: **0.1-dev** (not a release).
 | 10,000 VND | 40 |
 | 20,000 VND | 90 |
 | 50,000 VND | 150 |
-| 100,000 VND | 1,700 |
+| 100,000 VND | 700 |
 | 200,000 VND | 500 |
 | 500,000 VND | 900 |
 | 1,000,000 VND | 1,500 |
