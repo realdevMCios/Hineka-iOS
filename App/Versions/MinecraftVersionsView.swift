@@ -78,6 +78,8 @@ public struct MinecraftVersionsView: View {
     @AppStorage("hineka.selectedMinecraftVersion") private var selectedVersionID = ""
     @State private var channel: HinekaVersionChannel = .release
     @State private var searchText = ""
+    @State private var showingReadiness = false
+    @State private var readinessReport = ""
 
     public init() {}
 
@@ -210,6 +212,23 @@ public struct MinecraftVersionsView: View {
             }
             .navigationTitle("Phiên bản")
             .searchable(text: $searchText, prompt: "Tìm phiên bản Java")
+            .sheet(isPresented: $showingReadiness) {
+                NavigationStack {
+                    ScrollView {
+                        Text(readinessReport)
+                            .font(.body.monospaced())
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(20)
+                    }
+                    .navigationTitle("Kiểm tra profile")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .topBarTrailing) {
+                            Button("Đóng") { showingReadiness = false }
+                        }
+                    }
+                }
+            }
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
@@ -253,9 +272,25 @@ public struct MinecraftVersionsView: View {
             }
             .font(.subheadline)
 
-            Text("Chọn phiên bản để lưu profile. Nút tải lấy client, thư viện Java và assets chính thức; Java runtime, native iOS và khởi chạy game vẫn chưa được tích hợp.")
+            Text("Chọn phiên bản để lưu profile. Nút tải lấy client, thư viện Java, cấu hình log và assets chính thức.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
+
+            Button {
+                do {
+                    readinessReport = try MinecraftLaunchReadinessChecker.inspect(
+                        versionID: selectedVersionID
+                    ).summary
+                } catch {
+                    readinessReport = error.localizedDescription
+                }
+                showingReadiness = true
+            } label: {
+                Label("Kiểm tra khả năng chạy", systemImage: "stethoscope")
+                    .font(.subheadline.weight(.semibold))
+            }
+            .buttonStyle(.bordered)
+            .disabled(selectedVersionID.isEmpty)
         }
         .padding(15)
         .frame(maxWidth: .infinity, alignment: .leading)
