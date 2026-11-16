@@ -74,6 +74,7 @@ private final class MinecraftVersionCatalog: ObservableObject {
 
 public struct MinecraftVersionsView: View {
     @StateObject private var catalog = MinecraftVersionCatalog()
+    @StateObject private var installer = MinecraftVersionInstaller()
     @AppStorage("hineka.selectedMinecraftVersion") private var selectedVersionID = ""
     @State private var channel: HinekaVersionChannel = .release
     @State private var searchText = ""
@@ -111,6 +112,34 @@ public struct MinecraftVersionsView: View {
                 .padding(.horizontal)
 
                 List {
+                    if installer.isInstalling || installer.progress > 0 {
+                        Section("Tiến trình tải Minecraft") {
+                            VStack(alignment: .leading, spacing: 8) {
+                                ProgressView(value: installer.progress)
+                                Text(installer.statusMessage)
+                                    .font(.footnote)
+                                    .foregroundStyle(.secondary)
+                                if !installer.isInstalling && installer.progress >= 1 {
+                                    Label("Đã lưu tệp game vào bộ nhớ Hineka", systemImage: "checkmark.circle.fill")
+                                        .font(.footnote)
+                                        .foregroundStyle(.green)
+                                }
+                            }
+                            .padding(.vertical, 4)
+                        }
+                    }
+
+                    if let installError = installer.errorMessage {
+                        Section("Lỗi cài đặt") {
+                            Text(installError)
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                            Button("Đóng") {
+                                installer.errorMessage = nil
+                            }
+                        }
+                    }
+
                     if let error = catalog.errorMessage {
                         Section {
                             VStack(alignment: .leading, spacing: 8) {
@@ -126,10 +155,10 @@ public struct MinecraftVersionsView: View {
 
                     Section("Danh sách phiên bản") {
                         ForEach(visibleVersions) { version in
-                            Button {
-                                selectedVersionID = version.id
-                            } label: {
-                                HStack {
+                            HStack(spacing: 12) {
+                                Button {
+                                    selectedVersionID = version.id
+                                } label: {
                                     VStack(alignment: .leading, spacing: 4) {
                                         Text(version.id)
                                             .font(.headline)
@@ -138,15 +167,34 @@ public struct MinecraftVersionsView: View {
                                             .font(.caption)
                                             .foregroundStyle(.secondary)
                                     }
-                                    Spacer()
-                                    if selectedVersionID == version.id {
-                                        Image(systemName: "checkmark.circle.fill")
-                                            .foregroundStyle(.tint)
-                                    }
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .contentShape(Rectangle())
                                 }
-                                .contentShape(Rectangle())
+                                .buttonStyle(.plain)
+
+                                if installer.installedVersionIDs.contains(version.id) {
+                                    Image(systemName: "checkmark.seal.fill")
+                                        .foregroundStyle(.green)
+                                        .accessibilityLabel("Đã tải")
+                                }
+
+                                Button {
+                                    Task {
+                                        await installer.install(
+                                            versionID: version.id,
+                                            metadataURL: version.url,
+                                            metadataSHA1: version.sha1
+                                        )
+                                    }
+                                } label: {
+                                    Image(systemName: installer.installedVersionIDs.contains(version.id)
+                                          ? "arrow.clockwise.circle"
+                                          : "arrow.down.circle.fill")
+                                        .font(.title2)
+                                }
+                                .disabled(installer.isInstalling)
+                                .accessibilityLabel("Tải Minecraft \(version.id)")
                             }
-                            .buttonStyle(.plain)
                         }
                     }
                 }
@@ -205,7 +253,7 @@ public struct MinecraftVersionsView: View {
             }
             .font(.subheadline)
 
-            Text("Chọn phiên bản chỉ lưu lựa chọn. Tải game, cài loader và khởi chạy Java chưa được tích hợp.")
+            Text("Chọn phiên bản để lưu profile. Nút tải lấy client, thư viện Java và assets chính thức; Java runtime, native iOS và khởi chạy game vẫn chưa được tích hợp.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
         }
