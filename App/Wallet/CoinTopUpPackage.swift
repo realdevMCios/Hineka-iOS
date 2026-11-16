@@ -13,7 +13,7 @@ public struct CoinTopUpPackage: Identifiable, Hashable {
         .init(denominationVND: 10_000, coins: 40),
         .init(denominationVND: 20_000, coins: 90),
         .init(denominationVND: 50_000, coins: 150),
-        .init(denominationVND: 100_000, coins: nil), // Coin amount not supplied yet.
+        .init(denominationVND: 100_000, coins: 1_700),
         .init(denominationVND: 200_000, coins: 500),
         .init(denominationVND: 500_000, coins: 900),
         .init(denominationVND: 1_000_000, coins: 1_500)
