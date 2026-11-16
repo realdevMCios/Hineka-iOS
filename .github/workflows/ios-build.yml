@@ -28,6 +28,16 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v4
 
+      - name: Validate Swift package manifest
+        run: swift package dump-package
+
+      - name: Parse all Swift source files
+        run: |
+          while IFS= read -r -d '' source; do
+            echo "Parsing ${source}"
+            swiftc -frontend -parse "${source}"
+          done < <(find App -type f -name '*.swift' -print0)
+
       - name: Install XcodeGen
         run: brew install xcodegen
 
