@@ -8,6 +8,7 @@ Current development label: **0.1-dev** (not a release).
 
 - `App/Hineka/` — SwiftUI app entry point and initial tab/navigation shell.
 - `App/Wallet/` — Coin package model and draft Wallet screen.
+- `App/Runtime/` — experimental OpenJDK Mobile Zero JNI bridge and Java smoke test.
 - `App/Versions/` — Mojang version-manifest browser and first-pass vanilla client/library/asset downloader.
 - `App/Library/` — local .jar/.zip file import, inventory, enable flags, and delete controls.
 - `Package.swift` — iOS 18 Swift package for the HinekaUI source.
@@ -41,6 +42,6 @@ The downloader intentionally skips desktop native classifiers. It does not yet i
 
 ## Build and runtime status
 
-This repository currently contains a SwiftUI source package, an early launcher shell, and a first-pass vanilla asset downloader, not a complete Minecraft launcher. An experimental OpenJDK Mobile Zero JNI smoke-test bridge has been added. It must still be run on a physical device; the current pinned package contains only the upstream HelloWorld-style Java base module image, not the complete set of Java modules or iOS native graphics needed by Minecraft. The game renderer, Minecraft JVM launch pipeline, Forge/Fabric installation, authentication, backend, and real payments are not implemented. Runtime redistribution is blocked pending an AGPL-3.0/provenance review. A GitHub Actions workflow was added to attempt an iOS Simulator source build on pushes; the checked runs are still queued, so no successful build has been confirmed. The app has not been run on a device or packaged as an IPA.
+This repository currently contains a SwiftUI source package, an early launcher shell, a first-pass vanilla asset downloader, and an experimental JNI bridge around the OpenJDK Mobile Zero VM. The bridge exposes a Java smoke-test control on Home; it has not yet been run on a physical iPhone/iPad. The pinned package contains only the upstream HelloWorld-style Java base-module image, not the complete set of Java modules or iOS native graphics needed by Minecraft. The game renderer, Minecraft launch pipeline, Forge/Fabric installation, authentication, backend, and real payments are not implemented. Runtime redistribution is blocked pending an AGPL-3.0/provenance review. GitHub Actions now prepares the pinned runtime and attempts an unsigned generic iOS-device build; no successful Xcode build has yet been confirmed. The app has not been installed on a device or packaged as an IPA.
 
 Add the Swift files to an iOS App target in Xcode, then build and test on supported devices before calling it installable. Do not distribute a release IPA until runtime licensing, security, signing, and device testing are completed.
