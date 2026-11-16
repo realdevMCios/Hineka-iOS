@@ -13,7 +13,9 @@ struct MinecraftVersionInstallerError: LocalizedError {
     static let checksumMismatch = Self(message: "Tệp tải về không khớp SHA-1 do Mojang cung cấp.")
     static let sizeMismatch = Self(message: "Dung lượng tệp tải về không khớp metadata Minecraft.")
     static let invalidRelativePath = Self(message: "Đường dẫn tệp trong manifest không hợp lệ.")
-    static let invalidDownloadURL = Self(message: "Manifest chứa URL tải xuống không phải HTTPS.")
+    static let invalidDownloadURL = Self(message: "Manifest chứa URL tải xuống không hợp lệ hoặc không thuộc máy chủ được phép.")
+    static let missingIntegrityMetadata = Self(message: "Manifest thiếu SHA-1 hoặc dung lượng để xác minh tệp.")
+    static let insufficientDiskSpace = Self(message: "Thiết bị không đủ dung lượng trống để cài phiên bản Minecraft này.")
 }
 
 struct MinecraftVersionMetadata: Decodable {
@@ -21,6 +23,7 @@ struct MinecraftVersionMetadata: Decodable {
         let sha1: String?
         let size: Int64?
         let url: URL
+        let path: String?
     }
 
     struct VersionDownloads: Decodable {
@@ -56,6 +59,16 @@ struct MinecraftVersionMetadata: Decodable {
     let downloads: VersionDownloads
     let libraries: [Library]
     let javaVersion: JavaVersion?
+
+    struct LoggingInfo: Decodable {
+        struct Client: Decodable {
+            let argument: String?
+            let file: VerifiedDownload
+        }
+        let client: Client?
+    }
+
+    let logging: LoggingInfo?
 }
 
 struct MinecraftAssetIndex: Decodable {
@@ -133,7 +146,7 @@ public final class MinecraftVersionInstaller: ObservableObject {
         }
 
         do {
-            try Self.requireHTTPS(metadataURL)
+            try Self.requireAllowedMinecraftURL(metadataURL)
             let versionRoot = try versionDirectory(for: versionID)
             let metadataFile = versionRoot.appendingPathComponent("\(versionID).json")
             let metadataData = try await Self.fetchData(from: metadataURL)
@@ -158,11 +171,39 @@ public final class MinecraftVersionInstaller: ObservableObject {
             let librariesRoot = try libraryDirectory()
             for library in metadata.libraries {
                 guard let artifact = library.downloads?.artifact else { continue }
-                guard artifact.url.pathExtension.lowercased() == "jar" else { continue }
                 guard !artifact.url.lastPathComponent.lowercased().contains("natives") else { continue }
-                guard let mavenPath = Self.mavenPath(from: library.name) else { continue }
-                let destination = try Self.safeDestination(root: librariesRoot, relativePath: mavenPath)
+                guard let relativePath = artifact.path ?? Self.mavenPath(from: library.name) else { continue }
+                let destination = try Self.safeDestination(root: librariesRoot, relativePath: relativePath)
                 artifacts.append((artifact.url, destination, artifact.sha1, artifact.size))
+            }
+
+            // The game needs a complete asset index and all referenced objects.
+            // Estimate required storage before starting large downloads.
+            let estimatedLibraryBytes = artifacts.dropFirst().reduce(Int64(0)) { partial, item in
+                partial + max(0, item.3 ?? 0)
+            }
+            let estimatedClientBytes = max(0, client.size ?? 0)
+            let estimatedAssetBytes = max(0, assetInfo.totalSize ?? 0)
+            let estimatedBytes = estimatedLibraryBytes + estimatedClientBytes + estimatedAssetBytes
+            try Self.requireAvailableSpace(
+                in: appMinecraftDirectory(),
+                estimatedBytes: estimatedBytes
+            )
+
+            if let loggingFile = metadata.logging?.client?.file {
+                guard let loggingPath = loggingFile.path, !loggingPath.isEmpty else {
+                    throw MinecraftVersionInstallerError.invalidRelativePath
+                }
+                let logRoot = try assetsDirectory().appendingPathComponent("log_configs", isDirectory: true)
+                try fileManager.createDirectory(at: logRoot, withIntermediateDirectories: true)
+                let logDestination = try Self.safeDestination(root: logRoot, relativePath: loggingPath)
+                statusMessage = "Đang tải cấu hình log…"
+                try await Self.downloadVerified(
+                    url: loggingFile.url,
+                    to: logDestination,
+                    sha1: loggingFile.sha1,
+                    expectedSize: loggingFile.size
+                )
             }
 
             progress = 0.03
@@ -181,7 +222,7 @@ public final class MinecraftVersionInstaller: ObservableObject {
                 progress = min(0.03 + (Double(completed) / Double(totalFixed)) * 0.42, 0.45)
             }
 
-            try Self.requireHTTPS(assetInfo.url)
+            try Self.requireAllowedMinecraftURL(assetInfo.url)
             statusMessage = "Đang tải Asset Index…"
             let assetIndexData = try await Self.fetchData(from: assetInfo.url)
             try Self.verify(data: assetIndexData, expectedSHA1: assetInfo.sha1)
@@ -310,7 +351,7 @@ public final class MinecraftVersionInstaller: ObservableObject {
     }
 
     private nonisolated static func fetchData(from url: URL) async throws -> Data {
-        try requireHTTPS(url)
+        try requireAllowedMinecraftURL(url)
         var request = URLRequest(url: url)
         request.timeoutInterval = 60
         request.cachePolicy = .reloadIgnoringLocalCacheData
@@ -318,6 +359,10 @@ public final class MinecraftVersionInstaller: ObservableObject {
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
             throw MinecraftVersionInstallerError(message: "Máy chủ tải xuống trả về lỗi HTTP.")
         }
+        guard let finalURL = response.url else {
+            throw MinecraftVersionInstallerError.invalidDownloadURL
+        }
+        try requireAllowedMinecraftURL(finalURL)
         return data
     }
 
@@ -327,7 +372,10 @@ public final class MinecraftVersionInstaller: ObservableObject {
         sha1: String?,
         expectedSize: Int64?
     ) async throws {
-        try requireHTTPS(url)
+        try requireAllowedMinecraftURL(url)
+        guard let sha1, isSHA1(sha1), let expectedSize, expectedSize >= 0 else {
+            throw MinecraftVersionInstallerError.missingIntegrityMetadata
+        }
 
         if FileManager.default.fileExists(atPath: destination.path) {
             let attributes = try FileManager.default.attributesOfItem(atPath: destination.path)
@@ -348,6 +396,10 @@ public final class MinecraftVersionInstaller: ObservableObject {
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
             throw MinecraftVersionInstallerError(message: "Không tải được \(url.lastPathComponent).")
         }
+        guard let finalURL = response.url else {
+            throw MinecraftVersionInstallerError.invalidDownloadURL
+        }
+        try requireAllowedMinecraftURL(finalURL)
 
         let attributes = try FileManager.default.attributesOfItem(atPath: temporaryURL.path)
         let downloadedSize = (attributes[.size] as? NSNumber)?.int64Value
@@ -383,9 +435,33 @@ public final class MinecraftVersionInstaller: ObservableObject {
         return actual.caseInsensitiveCompare(expected) == .orderedSame
     }
 
-    private nonisolated static func requireHTTPS(_ url: URL) throws {
-        guard url.scheme?.lowercased() == "https", url.host != nil else {
+    private nonisolated static let allowedMinecraftHosts: Set<String> = [
+        "piston-meta.mojang.com",
+        "launchermeta.mojang.com",
+        "piston-data.mojang.com",
+        "launcher.mojang.com",
+        "libraries.minecraft.net",
+        "resources.download.minecraft.net",
+        "repo.maven.apache.org",
+        "repo1.maven.org"
+    ]
+
+    private nonisolated static func requireAllowedMinecraftURL(_ url: URL) throws {
+        guard url.scheme?.lowercased() == "https",
+              let host = url.host?.lowercased(),
+              allowedMinecraftHosts.contains(host) else {
             throw MinecraftVersionInstallerError.invalidDownloadURL
+        }
+    }
+
+    private func requireAvailableSpace(in directory: URL, estimatedBytes: Int64) throws {
+        let values = try directory.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey])
+        guard let available = values.volumeAvailableCapacityForImportantUsage else { return }
+
+        let safetyMargin: Int64 = 200 * 1024 * 1024
+        let (requiredWithReserve, overflow) = estimatedBytes.addingReportingOverflow(safetyMargin)
+        guard !overflow, available >= requiredWithReserve else {
+            throw MinecraftVersionInstallerError.insufficientDiskSpace
         }
     }
 
@@ -401,7 +477,11 @@ public final class MinecraftVersionInstaller: ObservableObject {
 
     /// Convert Maven coordinates (group:artifact:version[:classifier][@extension]) to a safe path.
     private nonisolated static func mavenPath(from coordinate: String) -> String? {
-        let withoutExtension = coordinate.split(separator: "@", maxSplits: 1).first.map(String.init) ?? coordinate
+        let coordinateParts = coordinate.split(separator: "@", maxSplits: 1).map(String.init)
+        let withoutExtension = coordinateParts.first ?? coordinate
+        let fileExtension = coordinateParts.count == 2 ? coordinateParts[1] : "jar"
+        guard !fileExtension.isEmpty,
+              fileExtension.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber) }) else { return nil }
         let parts = withoutExtension.split(separator: ":").map(String.init)
         guard parts.count >= 3, parts.count <= 4 else { return nil }
         guard parts.allSatisfy({ !$0.isEmpty && !$0.contains("/") && !$0.contains("..") }) else { return nil }
@@ -410,7 +490,7 @@ public final class MinecraftVersionInstaller: ObservableObject {
         let artifact = parts[1]
         let version = parts[2]
         let classifier = parts.count == 4 ? "-\(parts[3])" : ""
-        return "\(groupPath)/\(artifact)/\(version)/\(artifact)-\(version)\(classifier).jar"
+        return "\(groupPath)/\(artifact)/\(version)/\(artifact)-\(version)\(classifier).\(fileExtension)"
     }
 
     private nonisolated static func safeDestination(root: URL, relativePath: String) throws -> URL {
