@@ -82,6 +82,7 @@ libraries = info.get("AvailableLibraries", [])
 matches = [
     item for item in libraries
     if item.get("SupportedPlatform") == "ios"
+    and item.get("SupportedPlatformVariant") not in ("simulator", "maccatalyst")
     and "arm64" in item.get("SupportedArchitectures", [])
 ]
 if not matches:
