@@ -11,6 +11,7 @@ struct MinecraftVersionInstallerError: LocalizedError {
     static let missingAssetIndex = Self(message: "Manifest không có Asset Index.")
     static let invalidAssetHash = Self(message: "Asset Index chứa mã SHA-1 không hợp lệ.")
     static let checksumMismatch = Self(message: "Tệp tải về không khớp SHA-1 do Mojang cung cấp.")
+    static let sizeMismatch = Self(message: "Dung lượng tệp tải về không khớp metadata Minecraft.")
     static let invalidRelativePath = Self(message: "Đường dẫn tệp trong manifest không hợp lệ.")
     static let invalidDownloadURL = Self(message: "Manifest chứa URL tải xuống không phải HTTPS.")
 }
@@ -150,9 +151,9 @@ public final class MinecraftVersionInstaller: ObservableObject {
                 throw MinecraftVersionInstallerError.missingAssetIndex
             }
 
-            var artifacts: [(URL, URL, String?)] = []
+            var artifacts: [(URL, URL, String?, Int64?)] = []
             let clientURL = versionRoot.appendingPathComponent("\(versionID).jar")
-            artifacts.append((client.url, clientURL, client.sha1))
+            artifacts.append((client.url, clientURL, client.sha1, client.size))
 
             let librariesRoot = try libraryDirectory()
             for library in metadata.libraries {
@@ -161,16 +162,21 @@ public final class MinecraftVersionInstaller: ObservableObject {
                 guard !artifact.url.lastPathComponent.lowercased().contains("natives") else { continue }
                 guard let mavenPath = Self.mavenPath(from: library.name) else { continue }
                 let destination = try Self.safeDestination(root: librariesRoot, relativePath: mavenPath)
-                artifacts.append((artifact.url, destination, artifact.sha1))
+                artifacts.append((artifact.url, destination, artifact.sha1, artifact.size))
             }
 
             progress = 0.03
             let totalFixed = max(artifacts.count + 2, 1)
             var completed = 0
 
-            for (url, destination, sha1) in artifacts {
+            for (url, destination, sha1, expectedSize) in artifacts {
                 statusMessage = "Đang tải \(destination.lastPathComponent)…"
-                try await Self.downloadVerified(url: url, to: destination, sha1: sha1)
+                try await Self.downloadVerified(
+                    url: url,
+                    to: destination,
+                    sha1: sha1,
+                    expectedSize: expectedSize
+                )
                 completed += 1
                 progress = min(0.03 + (Double(completed) / Double(totalFixed)) * 0.42, 0.45)
             }
@@ -198,7 +204,7 @@ public final class MinecraftVersionInstaller: ObservableObject {
             let objects = assetIndex.objects.values
                 .filter { seenAssetHashes.insert($0.hash).inserted }
                 .sorted { $0.hash < $1.hash }
-            let assetURLs: [(URL, URL, String)] = try objects.map { object in
+            let assetURLs: [(URL, URL, String, Int64)] = try objects.map { object in
                 guard Self.isSHA1(object.hash) else {
                     throw MinecraftVersionInstallerError.invalidAssetHash
                 }
@@ -206,7 +212,7 @@ public final class MinecraftVersionInstaller: ObservableObject {
                 let destination = objectsRoot.appendingPathComponent(folder, isDirectory: true)
                     .appendingPathComponent(object.hash)
                 let url = URL(string: "https://resources.download.minecraft.net/\(folder)/\(object.hash)")!
-                return (url, destination, object.hash)
+                return (url, destination, object.hash, object.size)
             }
 
             let assetTotal = assetURLs.count
@@ -220,7 +226,12 @@ public final class MinecraftVersionInstaller: ObservableObject {
                 for _ in 0..<concurrency {
                     if let item = iterator.next() {
                         group.addTask {
-                            try await Self.downloadVerified(url: item.0, to: item.1, sha1: item.2)
+                            try await Self.downloadVerified(
+                                url: item.0,
+                                to: item.1,
+                                sha1: item.2,
+                                expectedSize: item.3
+                            )
                         }
                     }
                 }
@@ -233,7 +244,12 @@ public final class MinecraftVersionInstaller: ObservableObject {
 
                     if let next = iterator.next() {
                         group.addTask {
-                            try await Self.downloadVerified(url: next.0, to: next.1, sha1: next.2)
+                            try await Self.downloadVerified(
+                                url: next.0,
+                                to: next.1,
+                                sha1: next.2,
+                                expectedSize: next.3
+                            )
                         }
                     }
                 }
@@ -305,16 +321,38 @@ public final class MinecraftVersionInstaller: ObservableObject {
         return data
     }
 
-    private nonisolated static func downloadVerified(url: URL, to destination: URL, sha1: String?) async throws {
+    private nonisolated static func downloadVerified(
+        url: URL,
+        to destination: URL,
+        sha1: String?,
+        expectedSize: Int64?
+    ) async throws {
         try requireHTTPS(url)
-        if let sha1, FileManager.default.fileExists(atPath: destination.path) {
-            let existing = try Data(contentsOf: destination)
-            if sha1Matches(existing, expected: sha1) { return }
+
+        if FileManager.default.fileExists(atPath: destination.path) {
+            let attributes = try FileManager.default.attributesOfItem(atPath: destination.path)
+            let existingSize = (attributes[.size] as? NSNumber)?.int64Value
+            let sizeIsValid = expectedSize == nil || existingSize == expectedSize
+
+            if sizeIsValid {
+                if let sha1 {
+                    let existing = try Data(contentsOf: destination)
+                    if sha1Matches(existing, expected: sha1) { return }
+                } else {
+                    return
+                }
+            }
         }
 
         let (temporaryURL, response) = try await URLSession.shared.download(from: url)
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
             throw MinecraftVersionInstallerError(message: "Không tải được \(url.lastPathComponent).")
+        }
+
+        let attributes = try FileManager.default.attributesOfItem(atPath: temporaryURL.path)
+        let downloadedSize = (attributes[.size] as? NSNumber)?.int64Value
+        if let expectedSize, downloadedSize != expectedSize {
+            throw MinecraftVersionInstallerError.sizeMismatch
         }
 
         if let sha1 {
