@@ -1,4 +1,5 @@
 import Foundation
+import Combine
 import CryptoKit
 
 struct MinecraftVersionInstallerError: LocalizedError {
@@ -158,8 +159,6 @@ public final class MinecraftVersionInstaller: ObservableObject {
                 guard let artifact = library.downloads?.artifact else { continue }
                 guard artifact.url.pathExtension.lowercased() == "jar" else { continue }
                 guard !artifact.url.lastPathComponent.lowercased().contains("natives") else { continue }
-                let relativePath = URL(fileURLWithPath: artifact.url.path).lastPathComponent
-                _ = relativePath // Path is derived from Maven coordinates below, not from an arbitrary URL path.
                 guard let mavenPath = Self.mavenPath(from: library.name) else { continue }
                 let destination = try Self.safeDestination(root: librariesRoot, relativePath: mavenPath)
                 artifacts.append((artifact.url, destination, artifact.sha1))
