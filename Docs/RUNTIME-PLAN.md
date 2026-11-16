@@ -7,6 +7,7 @@ Status: architecture and integration plan. The vanilla downloader is implemented
 - Do not copy Amethyst/Pojav private entitlements, sandbox bypasses, code-signing bypasses, private Apple APIs, or jailbreak/TrollStore-only setup into Hineka.
 - Do not bundle Mojang's game JARs/assets or Java distributions without checking the relevant license and distribution terms. Prefer downloading permitted game files from official Mojang metadata after the user selects a version.
 - Keep every runtime component's source, binary provenance, architecture, version, license, and SHA-256 recorded.
+- Preserve OpenJDK Mobile's `LICENSE`, `ASSEMBLY_EXCEPTION`, and `ADDITIONAL_LICENSE_INFO` with any future runtime artifact. The experimental script currently builds for evaluation only; do not ship the generated static library until its complete license and linkage obligations are reviewed.
 
 ## Runtime architecture
 1. **Version manifest and vanilla downloader** — implemented in this repository as an early first pass. It retrieves Mojang metadata, verifies the metadata SHA-1, downloads the selected client JAR, Maven Java library artifacts, asset index, and asset objects, then writes a Hineka installed marker.
@@ -18,8 +19,12 @@ Status: architecture and integration plan. The vanilla downloader is implemented
 
 ## JIT and performance
 - Amethyst's own public README states that its iOS Minecraft Java launcher uses JIT to reach usable performance, and describes separate installation/JIT paths. This is a technical warning, not permission to copy its privileged configuration.
-- First prototype should investigate a sandbox-respecting interpreter/no-JIT runtime. Measure whether a tiny Java program and then vanilla Minecraft can run at an acceptable speed.
-- If an authorized JIT route is required, document the exact supported Apple signing/debug mechanism or approved installation channel. Do not attempt to manufacture private entitlements or bypass platform code-signing and sandbox protections.
+- Hineka now has an **experimental OpenJDK Mobile Zero build workflow** at `.github/workflows/openjdk-zero-ios.yml`. It is manually triggered and uses the upstream OpenJDK Mobile iOS instructions (AArch64 iOS target, Zero VM, JDK 24 boot JDK, Gluon mobile-support archive).
+- The script `Scripts/build-openjdk-ios-zero.sh` pins OpenJDK Mobile commit `c13417aa36f8f44755d0984b58aa735d0b41f233` and asks for `make CONF=ios-aarch64-zero-release static-libs-image`. The expected output is a static `libjvm.a`.
+- **This is only a toolchain proof-of-concept.** `libjvm.a` by itself is not a full JRE: class-library modules/resources, a JNI/JLI bootstrap, native dependencies, and app integration still need to be built and tested. The OpenJDK Mobile README says Zero is the default iOS JVM because iOS does not provide writable-and-executable sections.
+- First prototype should run a tiny Java class through the Zero VM, then test a vanilla Minecraft version whose required Java major version is supported. Benchmark frame rate and memory; Zero interpretation may be too slow for a playable experience.
+- The current build proof uses JDK 24 as the macOS boot JDK. It does not yet prove that the resulting runtime is compatible with Minecraft's required Java 8/17/21 versions. Separate compatible runtime builds may be required.
+- If an authorized JIT route is ever considered, document the exact supported Apple signing/debug mechanism or approved installation channel. Do not manufacture private entitlements or bypass platform code-signing and sandbox protections.
 - Do not advertise "Minecraft Java works" until a clean device test has launched a real game world.
 
 ## Current installer limitations
@@ -31,6 +36,7 @@ Status: architecture and integration plan. The vanilla downloader is implemented
 ## Distribution and "install directly" requirement
 - Hineka will not require ESign or KSign.
 - An iOS IPA cannot simply be installed unsigned. iOS requires a valid Apple signature/provisioning or an Apple-authorized distribution channel.
+- App Store submission also needs an explicit review of Apple Guideline 2.5.2 and the Apple Developer Program executable-code rules because the launcher downloads and interprets Minecraft Java bytecode. A TestFlight build is still signed and subject to Apple's developer program terms.
 - The current Apple alternative-app/web-distribution availability list covers Brazil, Japan, and the European Union; it does not list Vietnam. Users must also physically be in an eligible region and use an eligible Apple Account region.
 - Practical no-ESign/KSign routes to evaluate:
   - **TestFlight** for beta testing. Apple requires an uploaded build with application identifiers/provisioning information; builds can be tested for up to 90 days.
