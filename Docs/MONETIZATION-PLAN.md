@@ -13,6 +13,8 @@ Status: product specification only. No payment processing, store products, or Co
 - iOS: use Apple In-App Purchase for digital Premium and digital Coins unless the app and storefront qualify for a specific Apple-approved alternative.
 - Android distributed through Google Play: use Google Play Billing for digital Premium and Coins unless an applicable exception/program is confirmed.
 - MoMo and ZaloPay: consider only in regions/distribution channels where store policies and local law permit the proposed flow. Do not add an external checkout button to an iOS or Play build until the exact storefront policy has been reviewed.
+- Apple currently requires In-App Purchase for digital subscriptions, virtual currency, and app features in the general case; regional entitlements/programs can create limited alternatives. See [Apple App Review Guidelines, section 3.1](https://developer.apple.com/app-store/review/guidelines/).
+- Google Play generally requires Play Billing for digital goods, virtual currency, subscriptions, and app functionality, subject to listed exceptions/programs. See [Google Play Payments policy](https://support.google.com/googleplay/android-developer/answer/9858738).
 - Never collect card, bank, MoMo, ZaloPay, Apple, or Google credentials directly in Hineka.
 - Verify purchase receipts/tokens server-side with the relevant store/provider before granting Premium or Coins.
 
