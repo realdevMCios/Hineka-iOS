@@ -76,6 +76,11 @@ if [[ ! -s "${LIBJVM}" ]]; then
 fi
 
 cp "${LIBJVM}" "${OUTPUT_DIR}/libjvm.a"
+for license_file in LICENSE ASSEMBLY_EXCEPTION ADDITIONAL_LICENSE_INFO; do
+  if [[ -f "${OPENJDK_DIR}/${license_file}" ]]; then
+    cp "${OPENJDK_DIR}/${license_file}" "${OUTPUT_DIR}/${license_file}"
+  fi
+done
 printf '%s\n' "${OPENJDK_MOBILE_COMMIT}" > "${OUTPUT_DIR}/OPENJDK_COMMIT.txt"
 printf '%s\n' "$("${JAVA_HOME_PATH}/bin/java" -version 2>&1 | head -n 1)" > "${OUTPUT_DIR}/BOOT_JDK.txt"
 printf '%s\n' "Zero VM static library only; no Java class library image, JLI launcher, JNI bridge, or game runtime is included." > "${OUTPUT_DIR}/STATUS.txt"
