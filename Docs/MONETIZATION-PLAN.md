@@ -15,13 +15,12 @@ The owner's confirmed mapping is **top-up denomination in VND → Coins credited
 
 | Top-up denomination | Coins credited |
 |---:|---:|
-| 10,000 VND | 40 Coins |
 | 20,000 VND | 90 Coins |
-| 50,000 VND | 150 Coins |
-| 100,000 VND | 700 Coins |
+| 50,000 VND | 130 Coins |
+| 100,000 VND | 200 Coins |
 | 200,000 VND | 500 Coins |
 | 500,000 VND | 900 Coins |
-| 1,000,000 VND | 1,500 Coins |
+| 1,000,000 VND | 1,800 Coins |
 
 - These are owner-approved draft catalogue values. They are not live payment products until each provider/store mapping and server verification are configured.
 - Show a package as purchasable only when its denomination, Coin grant, provider product/configuration, and server verification are all configured.
