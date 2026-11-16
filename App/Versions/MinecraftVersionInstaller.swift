@@ -62,8 +62,15 @@ struct MinecraftVersionMetadata: Decodable {
 
     struct LoggingInfo: Decodable {
         struct Client: Decodable {
+            struct LogFile: Decodable {
+                let id: String
+                let sha1: String
+                let size: Int64
+                let url: URL
+            }
+
             let argument: String?
-            let file: VerifiedDownload
+            let file: LogFile
         }
         let client: Client?
     }
@@ -191,12 +198,12 @@ public final class MinecraftVersionInstaller: ObservableObject {
             )
 
             if let loggingFile = metadata.logging?.client?.file {
-                guard let loggingPath = loggingFile.path, !loggingPath.isEmpty else {
+                guard !loggingFile.id.isEmpty else {
                     throw MinecraftVersionInstallerError.invalidRelativePath
                 }
                 let logRoot = try assetsDirectory().appendingPathComponent("log_configs", isDirectory: true)
                 try fileManager.createDirectory(at: logRoot, withIntermediateDirectories: true)
-                let logDestination = try Self.safeDestination(root: logRoot, relativePath: loggingPath)
+                let logDestination = try Self.safeDestination(root: logRoot, relativePath: loggingFile.id)
                 statusMessage = "Đang tải cấu hình log…"
                 try await Self.downloadVerified(
                     url: loggingFile.url,
@@ -380,15 +387,9 @@ public final class MinecraftVersionInstaller: ObservableObject {
         if FileManager.default.fileExists(atPath: destination.path) {
             let attributes = try FileManager.default.attributesOfItem(atPath: destination.path)
             let existingSize = (attributes[.size] as? NSNumber)?.int64Value
-            let sizeIsValid = expectedSize == nil || existingSize == expectedSize
-
-            if sizeIsValid {
-                if let sha1 {
-                    let existing = try Data(contentsOf: destination)
-                    if sha1Matches(existing, expected: sha1) { return }
-                } else {
-                    return
-                }
+            if existingSize == expectedSize {
+                let existing = try Data(contentsOf: destination)
+                if sha1Matches(existing, expected: sha1) { return }
             }
         }
 
@@ -403,14 +404,12 @@ public final class MinecraftVersionInstaller: ObservableObject {
 
         let attributes = try FileManager.default.attributesOfItem(atPath: temporaryURL.path)
         let downloadedSize = (attributes[.size] as? NSNumber)?.int64Value
-        if let expectedSize, downloadedSize != expectedSize {
+        if downloadedSize != expectedSize {
             throw MinecraftVersionInstallerError.sizeMismatch
         }
 
-        if let sha1 {
-            let data = try Data(contentsOf: temporaryURL)
-            try verify(data: data, expectedSHA1: sha1)
-        }
+        let data = try Data(contentsOf: temporaryURL)
+        try verify(data: data, expectedSHA1: sha1)
 
         let parent = destination.deletingLastPathComponent()
         try FileManager.default.createDirectory(at: parent, withIntermediateDirectories: true)
