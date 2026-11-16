@@ -9,6 +9,15 @@ Status: architecture and integration plan. The vanilla downloader is implemented
 - Keep every runtime component's source, binary provenance, architecture, version, license, and SHA-256 recorded.
 - Preserve OpenJDK Mobile's `LICENSE`, `ASSEMBLY_EXCEPTION`, and `ADDITIONAL_LICENSE_INFO` with any future runtime artifact. The experimental script currently builds for evaluation only; do not ship the generated static library until its complete license and linkage obligations are reviewed.
 
+## OpenJDK Mobile Zero smoke-test integration
+
+- Hineka now has a first **JNI smoke-test integration** using the upstream `openjdk-mobile/ios-tools` snapshot. The Objective-C bridge calls `loadfunctions()`, starts `JNI_CreateJavaVM`, invokes `HinekaRuntimeSmokeTest.run()`, collects its output, and shuts down this short-lived test VM.
+- The Swift wrapper locates the staged `lib/modules` image and test JAR from its Swift Package resource bundle. Home has a development-only **Thử chạy Java** control. It is a Java startup test only and does not start Minecraft.
+- `Scripts/prepare-openjdk-ios-runtime.sh` downloads `OpenJDK.xcframework.zip` and `java_bundle-device.zip` from the upstream `snapshot` release, checks the published SHA-256 digests, verifies that the XCFramework contains an iOS arm64 device slice, stages `lib/modules`, and compiles the smoke-test JAR with Java 17-compatible bytecode.
+- The pinned release asset digests are recorded in the script. The snapshot assets were uploaded in March 2026; they are not the same as rebuilding the newer upstream source tree updated in September 2026. This is a reproducible **proof-of-concept dependency**, not a claim that the artifact is the latest OpenJDK Mobile build.
+- The upstream `openjdk-mobile/ios-tools` repository is licensed AGPL-3.0. Its build tree includes `symbol_keeper.cpp` in the static runtime link. The exact obligations for redistributing this prebuilt XCFramework with Hineka have **not** been legally reviewed. Keep this integration experimental and do not publish or distribute a bundled runtime until the license/provenance has been reviewed and the required notices/source-offer obligations are clear.
+- The CI workflow now prepares the pinned runtime inputs and compiles an unsigned generic iOS device target. A successful CI compile would still not prove that the Java VM starts on hardware; that needs a signed development build and a real iPhone/iPad test.
+
 ## Runtime architecture
 1. **Version manifest and vanilla downloader** — implemented in this repository as an early first pass. It retrieves Mojang metadata, verifies the metadata SHA-1, downloads the selected client JAR, Maven Java library artifacts, asset index, and asset objects, then writes a Hineka installed marker.
 2. **Java runtime provider** — not implemented. Hineka needs a supported OpenJDK/JRE build for iOS arm64, correct Java major versions for selected Minecraft versions, and a documented no-JIT vs authorized-JIT strategy.
@@ -19,11 +28,8 @@ Status: architecture and integration plan. The vanilla downloader is implemented
 
 ## JIT and performance
 - Amethyst's own public README states that its iOS Minecraft Java launcher uses JIT to reach usable performance, and describes separate installation/JIT paths. This is a technical warning, not permission to copy its privileged configuration.
-- Hineka now has an **experimental OpenJDK Mobile Zero build workflow** at `.github/workflows/openjdk-zero-ios.yml`. It is manually triggered and uses the upstream OpenJDK Mobile iOS instructions (AArch64 iOS target, Zero VM, JDK 24 boot JDK, Gluon mobile-support archive).
-- The script `Scripts/build-openjdk-ios-zero.sh` pins OpenJDK Mobile commit `c13417aa36f8f44755d0984b58aa735d0b41f233` and asks for `make CONF=ios-aarch64-zero-release static-libs-image`. The expected output is a static `libjvm.a`.
-- **This is only a toolchain proof-of-concept.** `libjvm.a` by itself is not a full JRE: class-library modules/resources, a JNI/JLI bootstrap, native dependencies, and app integration still need to be built and tested. The OpenJDK Mobile README says Zero is the default iOS JVM because iOS does not provide writable-and-executable sections.
-- First prototype should run a tiny Java class through the Zero VM, then test a vanilla Minecraft version whose required Java major version is supported. Benchmark frame rate and memory; Zero interpretation may be too slow for a playable experience.
-- The current build proof uses JDK 24 as the macOS boot JDK. It does not yet prove that the resulting runtime is compatible with Minecraft's required Java 8/17/21 versions. Separate compatible runtime builds may be required.
+- The first prototype is the tiny Java JNI smoke test described above. The next proof point is to run it on a physical device, inspect the reported Java/VM version, and only then evaluate whether the pinned runtime can support Minecraft's Java requirements. Benchmark frame rate and memory; Zero interpretation may be too slow for a playable experience.
+- The smoke-test JAR is compiled with Java 17-compatible bytecode, but that alone does not prove the bundled VM's exact version or compatibility with Minecraft 8/17/21 requirements. The test reports the actual VM version; separate runtimes may be required.
 - If an authorized JIT route is ever considered, document the exact supported Apple signing/debug mechanism or approved installation channel. Do not manufacture private entitlements or bypass platform code-signing and sandbox protections.
 - Do not advertise "Minecraft Java works" until a clean device test has launched a real game world.
 
