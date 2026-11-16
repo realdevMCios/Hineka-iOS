@@ -1,7 +1,9 @@
 import SwiftUI
 
-struct LauncherRootView: View {
-    var body: some View {
+public struct LauncherRootView: View {
+    public init() {}
+
+    public var body: some View {
         TabView {
             HomeDashboardView()
                 .tabItem {
