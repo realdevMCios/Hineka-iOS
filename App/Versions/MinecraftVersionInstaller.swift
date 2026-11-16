@@ -182,6 +182,9 @@ public final class MinecraftVersionInstaller: ObservableObject {
             let assetIndex = try JSONDecoder().decode(MinecraftAssetIndex.self, from: assetIndexData)
 
             let assetIndexID = assetInfo.id ?? metadata.assets ?? versionID
+            guard Self.isSafeIdentifier(assetIndexID) else {
+                throw MinecraftVersionInstallerError.invalidVersionID
+            }
             let indexesRoot = try assetsDirectory().appendingPathComponent("indexes", isDirectory: true)
             try fileManager.createDirectory(at: indexesRoot, withIntermediateDirectories: true)
             try assetIndexData.write(
@@ -191,7 +194,10 @@ public final class MinecraftVersionInstaller: ObservableObject {
 
             let objectsRoot = try assetsDirectory().appendingPathComponent("objects", isDirectory: true)
             try fileManager.createDirectory(at: objectsRoot, withIntermediateDirectories: true)
-            let objects = Array(assetIndex.objects.values)
+            var seenAssetHashes = Set<String>()
+            let objects = assetIndex.objects.values
+                .filter { seenAssetHashes.insert($0.hash).inserted }
+                .sorted { $0.hash < $1.hash }
             let assetURLs: [(URL, URL, String)] = try objects.map { object in
                 guard Self.isSHA1(object.hash) else {
                     throw MinecraftVersionInstallerError.invalidAssetHash
