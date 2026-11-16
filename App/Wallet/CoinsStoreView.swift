@@ -45,7 +45,7 @@ public struct CoinsStoreView: View {
                         }
                     }
 
-                    Text("Coin chỉ được cộng sau khi máy chủ xác minh giao dịch thành công. Gói 100.000đ đang chờ chốt số Coin.")
+                    Text("Coin chỉ được cộng sau khi máy chủ xác minh giao dịch thành công. Gói nạp hiển thị theo bảng giá đã chốt.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
