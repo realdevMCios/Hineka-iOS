@@ -105,7 +105,9 @@ JAR_PATH="${RESOURCE_DIR}/HinekaRuntimeSmokeTest.jar"
 
 mkdir -p "$CLASSES_DIR"
 rm -rf "${CLASSES_DIR:?}/"*
-javac -encoding UTF-8 -d "$CLASSES_DIR" "$JAVA_SOURCE"
+# Compile Java 17-compatible bytecode so this smoke test also works with the older
+# pinned upstream snapshot; the bundle's exact VM version is reported by the test.
+javac --release 17 -encoding UTF-8 -d "$CLASSES_DIR" "$JAVA_SOURCE"
 jar --create --file "$JAR_PATH" -C "$CLASSES_DIR" .
 
 if [[ ! -s "$JAR_PATH" ]]; then
