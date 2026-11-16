@@ -16,8 +16,13 @@ on:
       - "project.yml"
       - ".github/workflows/ios-build.yml"
 
+concurrency:
+  group: hineka-ios-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-ios-simulator:
+    timeout-minutes: 35
     runs-on: macos-15
     steps:
       - name: Check out source
