@@ -35,6 +35,8 @@ public struct LauncherRootView: View {
 }
 
 private struct HomeDashboardView: View {
+    @AppStorage("hineka.selectedMinecraftVersion") private var selectedVersionID = ""
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -61,6 +63,30 @@ private struct HomeDashboardView: View {
                         ),
                         in: RoundedRectangle(cornerRadius: 22)
                     )
+
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack {
+                            Label("Phiên bản đã chọn", systemImage: "square.stack.3d.up")
+                                .font(.headline)
+                            Spacer()
+                            Text(selectedVersionID.isEmpty ? "Chưa chọn" : selectedVersionID)
+                                .font(.subheadline.weight(.semibold))
+                        }
+
+                        NavigationLink {
+                            MinecraftVersionsView()
+                        } label: {
+                            Label("Chọn phiên bản Minecraft", systemImage: "arrow.right.circle")
+                                .font(.subheadline.weight(.semibold))
+                        }
+                    }
+                    .padding(16)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(.background, in: RoundedRectangle(cornerRadius: 18))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 18)
+                            .stroke(.quaternary, lineWidth: 1)
+                    }
 
                     VStack(alignment: .leading, spacing: 8) {
                         Label("Runtime Java chưa được tích hợp", systemImage: "wrench.and.screwdriver")
@@ -94,27 +120,6 @@ private struct HomeDashboardView: View {
                 .padding(16)
             }
             .navigationTitle("Hineka")
-        }
-    }
-}
-
-private struct VersionsView: View {
-    var body: some View {
-        NavigationStack {
-            List {
-                Section("Minecraft Java") {
-                    Label("Danh sách phiên bản sẽ tải từ API", systemImage: "arrow.down.circle")
-                    Text("Chưa kết nối catalog hoặc trình tải phiên bản.")
-                        .foregroundStyle(.secondary)
-                }
-
-                Section("Trạng thái") {
-                    LabeledContent("Runtime", value: "Chưa tích hợp")
-                    LabeledContent("Forge", value: "Chưa tích hợp")
-                    LabeledContent("Fabric", value: "Chưa tích hợp")
-                }
-            }
-            .navigationTitle("Phiên bản")
         }
     }
 }
