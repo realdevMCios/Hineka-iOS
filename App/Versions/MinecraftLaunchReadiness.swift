@@ -27,7 +27,7 @@ public struct HinekaLaunchReadiness: Identifiable {
     public var summary: String {
         var lines = [
             "Phiên bản: \(versionID)",
-            "Java yêu cầu: \(javaMajorVersion.map(String.init) ?? "không xác định")",
+            "Java yêu cầu: \(javaMajorVersion.map { String($0) } ?? "không xác định")",
             "Client JAR: \(clientJarExists ? "có" : "thiếu")",
             "Thư viện: \(libraryCount - missingLibraryCount)/\(libraryCount)",
             "Assets: \(assetCount - missingAssetCount)/\(assetCount)",
@@ -144,10 +144,10 @@ public enum MinecraftLaunchReadinessChecker {
         if !assetIndexExists || missingAssetCount > 0 {
             blockers.append("Thiếu Asset Index hoặc \(missingAssetCount) asset.")
         }
-        if metadata.javaVersion?.majorVersion == nil {
-            blockers.append("Không xác định được phiên bản Java yêu cầu.")
+        if let javaMajorVersion = metadata.javaVersion?.majorVersion {
+            blockers.append("OpenJDK runtime Java \(javaMajorVersion) chưa được tích hợp vào app.")
         } else {
-            blockers.append("OpenJDK runtime Java \(metadata.javaVersion!.majorVersion) chưa được tích hợp vào app.")
+            blockers.append("Không xác định được phiên bản Java yêu cầu.")
         }
         if nativeClassifierCount > 0 {
             blockers.append("Cần native renderer/LWJGL tương thích iOS; không thể dùng native desktop.")
