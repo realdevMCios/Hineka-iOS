@@ -78,16 +78,10 @@ public struct CoinsStoreView: View {
             Text(package.denominationVND.formatted(.number.locale(Locale(identifier: "vi_VN"))) + "đ")
                 .font(.headline)
 
-            if let coins = package.coins {
-                Text(coins.formatted(.number.locale(Locale(identifier: "vi_VN"))) + " Coins")
-                    .font(.title3.weight(.bold))
-            } else {
-                Text("Chờ chốt số Coin")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.secondary)
-            }
+            Text(package.coins.formatted(.number.locale(Locale(identifier: "vi_VN"))) + " Coins")
+                .font(.title3.weight(.bold))
 
-            Button(package.isConfigured ? "Chưa mở nạp" : "Chưa cấu hình") {}
+            Button("Chưa mở nạp") {}
                 .font(.footnote.weight(.semibold))
                 .buttonStyle(.bordered)
                 .disabled(true)
