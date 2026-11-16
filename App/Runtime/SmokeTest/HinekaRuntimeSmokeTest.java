@@ -1,6 +1,10 @@
 public final class HinekaRuntimeSmokeTest {
     private HinekaRuntimeSmokeTest() {}
 
+    public static void main(String[] args) {
+        System.out.println(run());
+    }
+
     public static String run() {
         StringBuilder result = new StringBuilder();
         result.append("Hineka Java runtime smoke test: PASS\n");
