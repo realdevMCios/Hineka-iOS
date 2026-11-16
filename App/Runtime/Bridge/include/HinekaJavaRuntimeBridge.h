@@ -7,8 +7,10 @@ NS_ASSUME_NONNULL_BEGIN
 /// Call only from the iOS main thread during this proof-of-concept phase.
 FOUNDATION_EXPORT NSString * _Nullable HinekaJavaRunSmokeTest(
     NSString *javaHomePath,
-    NSString *classPath,
-    NSError * _Nullable * _Nullable error
+    NSString *classPath
 );
+
+/// Returns the latest error from HinekaJavaRunSmokeTest, or nil after success.
+FOUNDATION_EXPORT NSString * _Nullable HinekaJavaLastError(void);
 
 NS_ASSUME_NONNULL_END
