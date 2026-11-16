@@ -56,15 +56,24 @@ if [[ ! -d "${SUPPORT_DIR}/libffi" || ! -d "${SUPPORT_DIR}/cups-2.3.6" ]]; then
   unzip -q "${SUPPORT_ZIP}" -d "${SUPPORT_DIR}"
 fi
 
+LIBFFI_INCLUDE="$(find "${SUPPORT_DIR}" -type d -path '*/libffi/include' -print -quit)"
+LIBFFI_LIB="$(find "${SUPPORT_DIR}" -type d -path '*/libffi/libs' -print -quit)"
+CUPS_INCLUDE="$(find "${SUPPORT_DIR}" -type d -name 'cups-2.3.6' -print -quit)"
+if [[ -z "${LIBFFI_INCLUDE}" || -z "${LIBFFI_LIB}" || -z "${CUPS_INCLUDE}" ]]; then
+  echo "The Gluon support archive is missing libffi or cups build support." >&2
+  find "${SUPPORT_DIR}" -maxdepth 4 -type d | sort
+  exit 1
+fi
+
 cd "${OPENJDK_DIR}"
 sh configure \
   --disable-warnings-as-errors \
   --openjdk-target=aarch64-macos-ios \
   --with-jvm-variants=zero \
   --with-boot-jdk="${JAVA_HOME_PATH}" \
-  --with-libffi-include="${SUPPORT_DIR}/libffi/include" \
-  --with-libffi-lib="${SUPPORT_DIR}/libffi/libs" \
-  --with-cups-include="${SUPPORT_DIR}/cups-2.3.6" \
+  --with-libffi-include="${LIBFFI_INCLUDE}" \
+  --with-libffi-lib="${LIBFFI_LIB}" \
+  --with-cups-include="${CUPS_INCLUDE}" \
   --with-sysroot="${IOS_SDK}"
 
 make CONF=ios-aarch64-zero-release static-libs-image
