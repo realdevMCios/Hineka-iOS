@@ -6,12 +6,14 @@ on:
     paths:
       - "App/**"
       - "Package.swift"
+      - "project.yml"
       - ".github/workflows/ios-build.yml"
   pull_request:
     branches: [main]
     paths:
       - "App/**"
       - "Package.swift"
+      - "project.yml"
       - ".github/workflows/ios-build.yml"
 
 jobs:
@@ -21,14 +23,20 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v4
 
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate --spec project.yml
+
       - name: Show Xcode version
         run: xcodebuild -version
 
-      - name: Build HinekaUI for iOS Simulator
+      - name: Build Hineka app for iOS Simulator
         run: >-
           xcodebuild
-          -scheme HinekaUI
+          -project Hineka.xcodeproj
+          -scheme Hineka
           -destination 'generic/platform=iOS Simulator'
-          -sdk iphonesimulator
           CODE_SIGNING_ALLOWED=NO
           build
