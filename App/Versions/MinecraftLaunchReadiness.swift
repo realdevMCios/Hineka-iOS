@@ -1,4 +1,4 @@
-import Foundation
+import Foundation\nimport CryptoKit
 
 public struct HinekaLaunchReadiness: Identifiable {
     public var id: String { versionID }
@@ -77,7 +77,8 @@ public enum MinecraftLaunchReadinessChecker {
         guard
             let markerData = try? Data(contentsOf: markerURL),
             let marker = try? JSONDecoder().decode(HinekaInstalledVersion.self, from: markerData),
-            marker.id == versionID
+            marker.id == versionID,
+            marker.clientJarRelativePath == "\(versionID)/\(versionID).jar"
         else {
             throw MinecraftVersionInstallerError(message: "Thiếu dấu xác nhận cài đặt của Hineka.")
         }
@@ -93,17 +94,25 @@ public enum MinecraftLaunchReadinessChecker {
 
             let fileURL = try safeDestination(root: librariesRoot, relativePath: relativePath)
             libraryCount += 1
-            if !fileManager.fileExists(atPath: fileURL.path) {
+            if !fileMatches(fileURL, sha1: artifact.sha1, size: artifact.size) {
                 missingLibraryCount += 1
             }
         }
 
         let assetIndexID = metadata.assetIndex?.id ?? metadata.assets ?? versionID
+        guard isSafeIdentifier(assetIndexID), marker.assetIndexID == assetIndexID else {
+            throw MinecraftVersionInstallerError(message: "Asset Index ID không khớp metadata của profile.")
+        }
         let assetsRoot = gameRoot.appendingPathComponent("assets", isDirectory: true)
         let indexURL = assetsRoot
             .appendingPathComponent("indexes", isDirectory: true)
             .appendingPathComponent("\(assetIndexID).json")
-        let assetIndexExists = fileManager.fileExists(atPath: indexURL.path)
+        let assetIndexExists: Bool
+        if let assetInfo = metadata.assetIndex {
+            assetIndexExists = fileMatches(indexURL, sha1: assetInfo.sha1, size: assetInfo.size)
+        } else {
+            assetIndexExists = false
+        }
 
         var assetCount = 0
         var missingAssetCount = 0
@@ -122,7 +131,7 @@ public enum MinecraftLaunchReadinessChecker {
                 let fileURL = objectRoot
                     .appendingPathComponent(String(object.hash.prefix(2)), isDirectory: true)
                     .appendingPathComponent(object.hash)
-                if !fileManager.fileExists(atPath: fileURL.path) {
+                if !fileMatches(fileURL, sha1: object.hash, size: object.size) {
                     missingAssetCount += 1
                 }
             }
@@ -177,6 +186,23 @@ public enum MinecraftLaunchReadinessChecker {
             nativeClassifierCount: nativeClassifierCount,
             blockers: blockers
         )
+    }
+
+    private static func fileMatches(_ url: URL, sha1: String?, size: Int64?) -> Bool {
+        guard let sha1, isSHA1(sha1), let size, size >= 0 else { return false }
+        guard
+            let attributes = try? FileManager.default.attributesOfItem(atPath: url.path),
+            let actualSize = (attributes[.size] as? NSNumber)?.int64Value,
+            actualSize == size,
+            let data = try? Data(contentsOf: url)
+        else {
+            return false
+        }
+
+        return Insecure.SHA1.hash(data: data)
+            .map { String(format: "%02x", $0) }
+            .joined()
+            .caseInsensitiveCompare(sha1) == .orderedSame
     }
 
     private static func isSafeIdentifier(_ value: String) -> Bool {
