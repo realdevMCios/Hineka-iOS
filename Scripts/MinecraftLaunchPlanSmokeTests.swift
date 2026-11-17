@@ -333,7 +333,8 @@ private struct MinecraftLaunchPlanSmokeTests {
 
         try expect(result.virtualFileCount == 1 && result.resourceFileCount == 0,
                    "Virtual asset mapping count is incorrect.")
-        try expect(try Data(contentsOf: destination) == payload,
+        let virtualPayload = try Data(contentsOf: destination)
+        try expect(virtualPayload == payload,
                    "Legacy virtual asset was not copied to the expected path.")
 
         let secondRun = try MinecraftAssetCompatibilityStager.stage(
@@ -363,7 +364,8 @@ private struct MinecraftLaunchPlanSmokeTests {
         let destination = fixture.resourcesDirectory.appendingPathComponent(logicalName)
         try expect(result.resourceFileCount == 1 && result.virtualFileCount == 0,
                    "map_to_resources count is incorrect.")
-        try expect(try Data(contentsOf: destination) == payload,
+        let resourcePayload = try Data(contentsOf: destination)
+        try expect(resourcePayload == payload,
                    "map_to_resources asset was not materialized.")
     }
 
@@ -384,8 +386,9 @@ private struct MinecraftLaunchPlanSmokeTests {
                 resourcesDirectory: fixture.resourcesDirectory
             )
             throw LaunchPlanTestFailure(description: "Path traversal asset name was accepted.")
-        } catch MinecraftVersionInstallerError.invalidRelativePath {
-            // Expected.
+        } catch let error as MinecraftVersionInstallerError {
+            try expect(error.localizedDescription == "Đường dẫn tệp trong manifest không hợp lệ.",
+                       "Unsafe asset path failed for an unexpected reason.")
         }
     }
 

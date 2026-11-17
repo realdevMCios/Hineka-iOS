@@ -568,7 +568,7 @@ public final class MinecraftVersionInstaller: ObservableObject {
                 }
             }
 
-            let resourcesRoot = appMinecraftDirectory().appendingPathComponent("resources", isDirectory: true)
+            let resourcesRoot = try appMinecraftDirectory().appendingPathComponent("resources", isDirectory: true)
             let compatibility = try MinecraftAssetCompatibilityStager.stage(
                 assetIndex: assetIndex,
                 assetsDirectory: assetsDirectory(),
