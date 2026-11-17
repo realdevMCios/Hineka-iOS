@@ -1,6 +1,6 @@
 # Hineka iOS renderer and game-session architecture
 
-Status: **interface contract, preflight validation, and a standalone Metal surface probe implemented; no production Minecraft renderer integrated**. Hineka now defines a backend protocol, rejects native artifacts that are not checksum-verified iOS arm64 Mach-O binaries, and contains an MTKView triangle test to exercise a native iOS render surface. No patched LWJGL native, SDL bridge, game JVM supervisor, or physical-device graphics test has been integrated.
+Status: **interface contract, preflight validation, and a standalone Metal surface probe implemented; build #66 compiles it successfully, but no physical-device presentation test or production Minecraft renderer is complete**. Hineka now defines a backend protocol, rejects native artifacts that are not checksum-verified iOS arm64 Mach-O binaries, and contains an MTKView triangle test to exercise a native iOS render surface. No patched LWJGL native, SDL bridge, or persistent game JVM supervisor has been integrated. The Metal probe still needs a signed physical iPhone/iPad test.
 
 ## Why this is a separate subsystem
 
