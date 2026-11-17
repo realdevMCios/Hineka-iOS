@@ -145,6 +145,191 @@ struct MinecraftAssetIndex: Decodable {
     }
 
     let objects: [String: AssetObject]
+    let virtual: Bool?
+    let mapToResources: Bool?
+
+    enum CodingKeys: String, CodingKey {
+        case objects
+        case virtual
+        case mapToResources = "map_to_resources"
+    }
+}
+
+/// Materializes the two compatibility layouts used by older Minecraft asset indexes.
+/// The source objects stay in assets/objects; generated copies are always hash-verified.
+struct MinecraftAssetCompatibilityStagingResult {
+    let virtualFileCount: Int
+    let resourceFileCount: Int
+}
+
+enum MinecraftAssetCompatibilityStager {
+    static func stage(
+        assetIndex: MinecraftAssetIndex,
+        assetsDirectory: URL,
+        resourcesDirectory: URL,
+        fileManager: FileManager = .default
+    ) throws -> MinecraftAssetCompatibilityStagingResult {
+        guard assetIndex.virtual == true || assetIndex.mapToResources == true else {
+            return MinecraftAssetCompatibilityStagingResult(
+                virtualFileCount: 0,
+                resourceFileCount: 0
+            )
+        }
+
+        let objectsDirectory = assetsDirectory.appendingPathComponent("objects", isDirectory: true)
+        let virtualRoot = assetsDirectory
+            .appendingPathComponent("virtual", isDirectory: true)
+            .appendingPathComponent("legacy", isDirectory: true)
+        var virtualFileCount = 0
+        var resourceFileCount = 0
+
+        for (logicalName, object) in assetIndex.objects.sorted(by: { $0.key < $1.key }) {
+            guard isSHA1(object.hash), object.size >= 0 else {
+                throw MinecraftVersionInstallerError.invalidAssetHash
+            }
+
+            let source = objectsDirectory
+                .appendingPathComponent(String(object.hash.prefix(2)), isDirectory: true)
+                .appendingPathComponent(object.hash)
+            guard isVerifiedObject(source, sha1: object.hash, size: object.size, fileManager: fileManager) else {
+                throw MinecraftVersionInstallerError(
+                    message: "Asset object \(object.hash) bị thiếu hoặc không khớp SHA-1/dung lượng."
+                )
+            }
+
+            if assetIndex.virtual == true {
+                let destination = try safeAssetDestination(
+                    root: virtualRoot,
+                    relativePath: logicalName,
+                    fileManager: fileManager
+                )
+                try copyVerifiedObject(
+                    from: source,
+                    to: destination,
+                    sha1: object.hash,
+                    size: object.size,
+                    fileManager: fileManager
+                )
+                virtualFileCount += 1
+            }
+
+            if assetIndex.mapToResources == true {
+                let destination = try safeAssetDestination(
+                    root: resourcesDirectory,
+                    relativePath: logicalName,
+                    fileManager: fileManager
+                )
+                try copyVerifiedObject(
+                    from: source,
+                    to: destination,
+                    sha1: object.hash,
+                    size: object.size,
+                    fileManager: fileManager
+                )
+                resourceFileCount += 1
+            }
+        }
+
+        return MinecraftAssetCompatibilityStagingResult(
+            virtualFileCount: virtualFileCount,
+            resourceFileCount: resourceFileCount
+        )
+    }
+
+    private static func safeAssetDestination(
+        root: URL,
+        relativePath: String,
+        fileManager: FileManager
+    ) throws -> URL {
+        let components = relativePath.split(separator: "/", omittingEmptySubsequences: false)
+        guard !relativePath.isEmpty,
+              !relativePath.hasPrefix("/"),
+              !relativePath.contains("\\"),
+              !relativePath.contains("\0"),
+              !components.isEmpty,
+              components.allSatisfy({ !$0.isEmpty && $0 != "." && $0 != ".." }) else {
+            throw MinecraftVersionInstallerError.invalidRelativePath
+        }
+
+        try fileManager.createDirectory(at: root, withIntermediateDirectories: true)
+        guard let rootAttributes = try? fileManager.attributesOfItem(atPath: root.path),
+              rootAttributes[.type] as? FileAttributeType == .typeDirectory else {
+            throw MinecraftVersionInstallerError.invalidRelativePath
+        }
+
+        var parent = root
+        for component in components.dropLast() {
+            parent.appendPathComponent(String(component), isDirectory: true)
+            if fileManager.fileExists(atPath: parent.path) {
+                guard let attributes = try? fileManager.attributesOfItem(atPath: parent.path),
+                      attributes[.type] as? FileAttributeType == .typeDirectory else {
+                    throw MinecraftVersionInstallerError.invalidRelativePath
+                }
+            } else {
+                try fileManager.createDirectory(at: parent, withIntermediateDirectories: false)
+            }
+        }
+
+        let destination = parent.appendingPathComponent(String(components.last!), isDirectory: false)
+        if fileManager.fileExists(atPath: destination.path) {
+            guard let attributes = try? fileManager.attributesOfItem(atPath: destination.path),
+                  attributes[.type] as? FileAttributeType == .typeRegular else {
+                throw MinecraftVersionInstallerError.invalidRelativePath
+            }
+        }
+        return destination
+    }
+
+    private static func copyVerifiedObject(
+        from source: URL,
+        to destination: URL,
+        sha1: String,
+        size: Int64,
+        fileManager: FileManager
+    ) throws {
+        if isVerifiedObject(destination, sha1: sha1, size: size, fileManager: fileManager) {
+            return
+        }
+
+        let temporary = destination.deletingLastPathComponent()
+            .appendingPathComponent(".hineka-asset-\(UUID().uuidString).tmp")
+        defer { try? fileManager.removeItem(at: temporary) }
+
+        try fileManager.copyItem(at: source, to: temporary)
+        if fileManager.fileExists(atPath: destination.path) {
+            try fileManager.removeItem(at: destination)
+        }
+        try fileManager.moveItem(at: temporary, to: destination)
+        guard isVerifiedObject(destination, sha1: sha1, size: size, fileManager: fileManager) else {
+            try? fileManager.removeItem(at: destination)
+            throw MinecraftVersionInstallerError.checksumMismatch
+        }
+    }
+
+    private static func isVerifiedObject(
+        _ url: URL,
+        sha1: String,
+        size: Int64,
+        fileManager: FileManager
+    ) -> Bool {
+        guard
+            let attributes = try? fileManager.attributesOfItem(atPath: url.path),
+            attributes[.type] as? FileAttributeType == .typeRegular,
+            let actualSize = (attributes[.size] as? NSNumber)?.int64Value,
+            actualSize == size,
+            let data = try? Data(contentsOf: url, options: [.mappedIfSafe])
+        else {
+            return false
+        }
+        let actualSHA1 = Insecure.SHA1.hash(data: data)
+            .map { String(format: "%02x", $0) }
+            .joined()
+        return actualSHA1.caseInsensitiveCompare(sha1) == .orderedSame
+    }
+
+    private static func isSHA1(_ value: String) -> Bool {
+        value.count == 40 && value.allSatisfy { $0.isHexDigit }
+    }
 }
 
 struct HinekaInstalledVersion: Codable {
@@ -381,6 +566,17 @@ public final class MinecraftVersionInstaller: ObservableObject {
                         }
                     }
                 }
+            }
+
+            let resourcesRoot = appMinecraftDirectory().appendingPathComponent("resources", isDirectory: true)
+            let compatibility = try MinecraftAssetCompatibilityStager.stage(
+                assetIndex: assetIndex,
+                assetsDirectory: assetsDirectory(),
+                resourcesDirectory: resourcesRoot,
+                fileManager: fileManager
+            )
+            if compatibility.virtualFileCount > 0 || compatibility.resourceFileCount > 0 {
+                statusMessage = "Đã dựng tài nguyên tương thích cũ (virtual: \(compatibility.virtualFileCount), resources: \(compatibility.resourceFileCount))…"
             }
 
             let installed = HinekaInstalledVersion(

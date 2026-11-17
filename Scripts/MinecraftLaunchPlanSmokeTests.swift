@@ -1,4 +1,5 @@
 import Foundation
+import CryptoKit
 
 private struct LaunchPlanTestFailure: Error, CustomStringConvertible {
     let description: String
@@ -54,7 +55,12 @@ private struct MinecraftLaunchPlanSmokeTests {
         try testUnsafeLoggingPathIsRejected()
         try testAssetIndexMismatchIsRejected()
         try testRuntimeMismatchIsReported()
-        print("Hineka launch-plan smoke tests: 11/11 passed")
+        try testLegacyVirtualAssetsAreMaterialized()
+        try testMapToResourcesAssetsAreMaterialized()
+        try testUnsafeAssetNamesAreRejected()
+        try testCorruptAssetObjectsAreRejected()
+        try testNonCompatibilityIndexesAreNoOps()
+        print("Hineka launch-plan and asset compatibility smoke tests: 16/16 passed")
     }
 
     private static func expect(_ condition: @autoclosure () -> Bool, _ message: String) throws {
@@ -303,6 +309,168 @@ private struct MinecraftLaunchPlanSmokeTests {
         let plan = try build(fixture, metadata: baseMetadata(), runtimeJavaMajorVersion: 21)
         try expect(plan.blockers.contains(where: { $0.contains("Java 21") && $0.contains("Java 17") }),
                    "Java runtime mismatch was not reported.")
+    }
+
+    private static func testLegacyVirtualAssetsAreMaterialized() throws {
+        let fixture = try AssetStagerFixture()
+        defer { fixture.remove() }
+        let logicalName = "minecraft/sounds/random/click.ogg"
+        let payload = Data("legacy-audio-asset".utf8)
+        let object = try fixture.writeObject(payload)
+        let index = try fixture.decodeIndex([
+            "virtual": true,
+            "objects": [logicalName: object]
+        ])
+
+        let result = try MinecraftAssetCompatibilityStager.stage(
+            assetIndex: index,
+            assetsDirectory: fixture.assetsDirectory,
+            resourcesDirectory: fixture.resourcesDirectory
+        )
+        let destination = fixture.assetsDirectory
+            .appendingPathComponent("virtual/legacy", isDirectory: true)
+            .appendingPathComponent(logicalName)
+
+        try expect(result.virtualFileCount == 1 && result.resourceFileCount == 0,
+                   "Virtual asset mapping count is incorrect.")
+        try expect(try Data(contentsOf: destination) == payload,
+                   "Legacy virtual asset was not copied to the expected path.")
+
+        let secondRun = try MinecraftAssetCompatibilityStager.stage(
+            assetIndex: index,
+            assetsDirectory: fixture.assetsDirectory,
+            resourcesDirectory: fixture.resourcesDirectory
+        )
+        try expect(secondRun.virtualFileCount == 1, "Virtual asset staging should be idempotent.")
+    }
+
+    private static func testMapToResourcesAssetsAreMaterialized() throws {
+        let fixture = try AssetStagerFixture()
+        defer { fixture.remove() }
+        let logicalName = "sound/old_menu.ogg"
+        let payload = Data("legacy-resource".utf8)
+        let object = try fixture.writeObject(payload)
+        let index = try fixture.decodeIndex([
+            "map_to_resources": true,
+            "objects": [logicalName: object]
+        ])
+
+        let result = try MinecraftAssetCompatibilityStager.stage(
+            assetIndex: index,
+            assetsDirectory: fixture.assetsDirectory,
+            resourcesDirectory: fixture.resourcesDirectory
+        )
+        let destination = fixture.resourcesDirectory.appendingPathComponent(logicalName)
+        try expect(result.resourceFileCount == 1 && result.virtualFileCount == 0,
+                   "map_to_resources count is incorrect.")
+        try expect(try Data(contentsOf: destination) == payload,
+                   "map_to_resources asset was not materialized.")
+    }
+
+    private static func testUnsafeAssetNamesAreRejected() throws {
+        let fixture = try AssetStagerFixture()
+        defer { fixture.remove() }
+        let payload = Data("safe-object".utf8)
+        let object = try fixture.writeObject(payload)
+        let index = try fixture.decodeIndex([
+            "virtual": true,
+            "objects": ["../escape.bin": object]
+        ])
+
+        do {
+            _ = try MinecraftAssetCompatibilityStager.stage(
+                assetIndex: index,
+                assetsDirectory: fixture.assetsDirectory,
+                resourcesDirectory: fixture.resourcesDirectory
+            )
+            throw LaunchPlanTestFailure(description: "Path traversal asset name was accepted.")
+        } catch MinecraftVersionInstallerError.invalidRelativePath {
+            // Expected.
+        }
+    }
+
+    private static func testCorruptAssetObjectsAreRejected() throws {
+        let fixture = try AssetStagerFixture()
+        defer { fixture.remove() }
+        let payload = Data("good-object".utf8)
+        let corrupt = Data("bad-object!".utf8)
+        let object = try fixture.writeObject(corrupt, expectedPayloadForHash: payload)
+        let index = try fixture.decodeIndex([
+            "virtual": true,
+            "objects": ["minecraft/textures/missing.png": object]
+        ])
+
+        do {
+            _ = try MinecraftAssetCompatibilityStager.stage(
+                assetIndex: index,
+                assetsDirectory: fixture.assetsDirectory,
+                resourcesDirectory: fixture.resourcesDirectory
+            )
+            throw LaunchPlanTestFailure(description: "Corrupt source asset object was accepted.")
+        } catch let error as MinecraftVersionInstallerError {
+            try expect(error.localizedDescription.contains("SHA-1"),
+                       "Corrupt source asset failed for an unexpected reason.")
+        }
+    }
+
+    private static func testNonCompatibilityIndexesAreNoOps() throws {
+        let fixture = try AssetStagerFixture()
+        defer { fixture.remove() }
+        let payload = Data("modern-object".utf8)
+        let object = try fixture.writeObject(payload)
+        let index = try fixture.decodeIndex(["objects": ["minecraft/lang/en_us.json": object]])
+
+        let result = try MinecraftAssetCompatibilityStager.stage(
+            assetIndex: index,
+            assetsDirectory: fixture.assetsDirectory,
+            resourcesDirectory: fixture.resourcesDirectory
+        )
+        try expect(result.virtualFileCount == 0 && result.resourceFileCount == 0,
+                   "Modern non-virtual indexes should not duplicate assets.")
+        let virtualRoot = fixture.assetsDirectory.appendingPathComponent("virtual")
+        try expect(!FileManager.default.fileExists(atPath: virtualRoot.path),
+                   "A virtual directory was created for an index without compatibility flags.")
+    }
+
+    private struct AssetStagerFixture {
+        let root: URL
+        let assetsDirectory: URL
+        let resourcesDirectory: URL
+
+        init() throws {
+            root = FileManager.default.temporaryDirectory
+                .appendingPathComponent("HinekaAssetStagerTests-\(UUID().uuidString)", isDirectory: true)
+            assetsDirectory = root.appendingPathComponent("assets", isDirectory: true)
+            resourcesDirectory = root.appendingPathComponent("resources", isDirectory: true)
+            try FileManager.default.createDirectory(
+                at: assetsDirectory.appendingPathComponent("objects"),
+                withIntermediateDirectories: true
+            )
+            try FileManager.default.createDirectory(at: resourcesDirectory, withIntermediateDirectories: true)
+        }
+
+        func writeObject(_ stored: Data, expectedPayloadForHash: Data? = nil) throws -> [String: Any] {
+            let hashPayload = expectedPayloadForHash ?? stored
+            let hash = Insecure.SHA1.hash(data: hashPayload)
+                .map { String(format: "%02x", $0) }
+                .joined()
+            let objectURL = assetsDirectory.appendingPathComponent("objects/\(hash.prefix(2))/\(hash)")
+            try FileManager.default.createDirectory(
+                at: objectURL.deletingLastPathComponent(),
+                withIntermediateDirectories: true
+            )
+            try stored.write(to: objectURL)
+            return ["hash": hash, "size": stored.count]
+        }
+
+        func decodeIndex(_ json: [String: Any]) throws -> MinecraftAssetIndex {
+            let data = try JSONSerialization.data(withJSONObject: json, options: [.sortedKeys])
+            return try JSONDecoder().decode(MinecraftAssetIndex.self, from: data)
+        }
+
+        func remove() {
+            try? FileManager.default.removeItem(at: root)
+        }
     }
 
     private static func baseMetadata() -> [String: Any] {
