@@ -69,7 +69,9 @@ Preserve Hineka's current SwiftUI UI and local installation code. Add an isolate
 
 ## Proposed first vertical slice
 
-- Pick one Minecraft release whose `javaVersion.majorVersion` and LWJGL dependencies are known from its official version metadata.
+- [x] Add a dependency-injected vanilla `HinekaGameLaunchPlanBuilder` that resolves common Mojang arguments and launch placeholders without executing Java.
+- [ ] Add unit fixtures for a pinned official vanilla version and verify the resolved classpath, JVM options, game arguments, feature rules and OS/architecture rules.
+- [ ] Pick one Minecraft release whose `javaVersion.majorVersion` and LWJGL dependencies are known from its official version metadata.
 - Prove the full runtime on a **signed physical device**, not just in CI.
 - First visual milestone: create a renderer context and clear the Hineka game surface to a known color.
 - Second milestone: run a tiny GLFW window/input test through the same native bridge.
@@ -86,4 +88,4 @@ Preserve Hineka's current SwiftUI UI and local installation code. Add an isolate
 
 ## Current recommendation
 
-Use **Amethyst-iOS as the main technical map**, **HynisJE to compare newer Java/iOS changes**, and **FlameLauncher to study the separation between launch plan, runtime interface and renderer selection**. Keep Hineka's own UI and installer. The next coding task should be a testable `HinekaGameLaunchPlan` with unit fixtures for a single vanilla version; do not import large runtime binaries or attempt Forge/Fabric yet.
+Use **Amethyst-iOS as the main technical map**, **HynisJE to compare newer Java/iOS changes**, and **FlameLauncher to study the separation between launch plan, runtime interface and renderer selection**. Keep Hineka's own UI and installer. The first launch-plan source is now in `App/Versions/MinecraftLaunchPlan.swift`; add unit fixtures for one pinned vanilla profile next. Do not import large runtime binaries or attempt Forge/Fabric yet.

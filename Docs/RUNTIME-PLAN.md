@@ -1,6 +1,6 @@
 # Hineka Java runtime and installation plan
 
-Status: **the unsigned generic iOS arm64 Xcode build passed in GitHub Actions build #52 (2026-11-17)**. The Java smoke-test bridge is integrated in source, but it has not yet been run on a signed physical iPhone/iPad. The full Minecraft-compatible Java runtime, iOS native libraries, renderer, and game launch are not implemented.
+Status: **the unsigned generic iOS arm64 Xcode build passed in GitHub Actions build #52 (2026-11-17)**. The first testable vanilla launch-plan builder is now in source and build #53 is validating it. The Java smoke-test bridge has not yet been run on a signed physical iPhone/iPad. The full Minecraft-compatible Java runtime, iOS native libraries, renderer, and actual game launch are not implemented.
 
 ## Non-negotiable project boundaries
 - This is the separate **Hineka iOS** project. Do not modify `realdevMCios/test-script` or any other unrelated repository.
@@ -22,7 +22,7 @@ Status: **the unsigned generic iOS arm64 Xcode build passed in GitHub Actions bu
 2. **Java runtime provider** — an upstream OpenJDK Mobile Zero image and a minimal JNI smoke-test bridge are wired into source. The app must still build and run on a physical device before this counts as a working runtime. A complete Minecraft-compatible JRE/module set for the selected Java major versions is not yet verified.
 3. **Native library layer** — not implemented. Minecraft libraries with Linux/macOS/Windows native classifiers cannot be treated as iOS binaries. Hineka needs specifically built iOS arm64-compatible native components and license review.
 4. **Graphics and input bridge** — not implemented. Define a renderer surface, OpenGL compatibility strategy, audio/input bridge, safe-area handling, touch controls, external keyboard/mouse, and controller support.
-5. **Launch profile and process supervisor** — not implemented. Build a classpath and JVM arguments from validated version metadata, apply profile-specific mods/resource packs, capture logs, support cancellation, and cleanly stop the Java process.
+5. **Launch profile / plan** — first pass implemented in `App/Versions/MinecraftLaunchPlan.swift`. It decodes Mojang JVM/game arguments (including legacy `minecraftArguments`), evaluates OS/architecture/feature rules, resolves common placeholders, constructs a Java classpath, converts `-cp` to the `java.class.path` VM property for a future JNI-created VM, and reports missing Java/native/runtime prerequisites. It does not execute Java. **Game process supervisor** remains unimplemented; add log streaming, cancellation, pause/stop and lifecycle only after the JNI game entry point exists.
 6. **Loader installers** — Forge/Fabric/Quilt are not implemented. Add only after vanilla can launch and runtime compatibility has been tested.
 
 ## JIT and performance
@@ -34,6 +34,7 @@ Status: **the unsigned generic iOS arm64 Xcode build passed in GitHub Actions bu
 
 ## Current installer limitations
 - The installer downloads the vanilla version JSON, client JAR, Java artifact libraries, asset index, and asset objects.
+- The first launch-plan builder is dependency-injected for tests and has an installed-profile entry point. It produces an inspectable plan but deliberately reports blockers until a matching complete runtime, native renderer/LWJGL layer, and persistent game-JVM bridge exist.
 - It deliberately does not download native classifiers, because desktop native libraries are not compatible with iOS.
 - It does not yet perform Mojang argument/rule resolution, install a JRE, authenticate a Microsoft account, prepare the final classpath, launch Java, or install Forge/Fabric.
 - The installer needs device testing and a review of older versions and special library metadata before it is considered production-ready.
