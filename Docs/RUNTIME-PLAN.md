@@ -1,6 +1,6 @@
 # Hineka Java runtime and installation plan
 
-Status: **the unsigned generic iOS arm64 Xcode build passed in GitHub Actions build #52 (2026-11-17)**. The first testable vanilla launch-plan builder is now in source and build #53 is validating it. The Java smoke-test bridge has not yet been run on a signed physical iPhone/iPad. The full Minecraft-compatible Java runtime, iOS native libraries, renderer, and actual game launch are not implemented.
+Status: **GitHub Actions build #56 passed on 2026-11-17**, including 11 launch-plan smoke tests and an unsigned generic iOS device Xcode build. This validates compilation and host-side launch-plan logic only. The Java smoke-test bridge has not yet been run on a signed physical iPhone/iPad. The full Minecraft-compatible Java runtime, iOS native libraries, renderer, and actual game launch are not implemented.
 
 ## Non-negotiable project boundaries
 - This is the separate **Hineka iOS** project. Do not modify `realdevMCios/test-script` or any other unrelated repository.
@@ -15,14 +15,14 @@ Status: **the unsigned generic iOS arm64 Xcode build passed in GitHub Actions bu
 - `Scripts/prepare-openjdk-ios-runtime.sh` downloads `OpenJDK.xcframework.zip` and `java_bundle-device.zip` from the upstream `snapshot` release, checks the published SHA-256 digests, verifies that the XCFramework contains an iOS arm64 device slice, stages `lib/modules`, and compiles the smoke-test JAR with Java 17-compatible bytecode.
 - The pinned release asset digests are recorded in the script. The snapshot assets were uploaded in March 2026; they are not the same as rebuilding the newer upstream source tree updated in September 2026. This is a reproducible **proof-of-concept dependency**, not a claim that the artifact is the latest OpenJDK Mobile build.
 - The upstream `openjdk-mobile/ios-tools` repository is licensed AGPL-3.0. Its build tree includes `symbol_keeper.cpp` in the static runtime link. The exact obligations for redistributing this prebuilt XCFramework with Hineka have **not** been legally reviewed. Keep this integration experimental and do not publish or distribute a bundled runtime until the license/provenance has been reviewed and the required notices/source-offer obligations are clear.
-- GitHub Actions build **#52** passed all steps, including `xcodebuild` for a generic iOS device target with code signing disabled. The Java smoke-test JAR is run on the macOS CI host; this is not a test of the JVM on an iPhone/iPad. A signed device build and real-device test are still required.
+- GitHub Actions build **#56** passed all steps, including 11 launch-plan smoke tests and `xcodebuild` for a generic iOS device target with code signing disabled. The Java smoke-test JAR is run on the macOS CI host; this is not a test of the JVM on an iPhone/iPad. A signed device build and real-device test are still required.
 
 ## Runtime architecture
 1. **Version manifest and vanilla downloader** — implemented in this repository as an early first pass. It retrieves Mojang metadata, verifies the metadata SHA-1, downloads the selected client JAR, Maven Java library artifacts, asset index, and asset objects, then writes a Hineka installed marker.
 2. **Java runtime provider** — an upstream OpenJDK Mobile Zero image and a minimal JNI smoke-test bridge are wired into source. The app must still build and run on a physical device before this counts as a working runtime. A complete Minecraft-compatible JRE/module set for the selected Java major versions is not yet verified.
 3. **Native library layer** — not implemented. Minecraft libraries with Linux/macOS/Windows native classifiers cannot be treated as iOS binaries. Hineka needs specifically built iOS arm64-compatible native components and license review.
 4. **Graphics and input bridge** — not implemented. Define a renderer surface, OpenGL compatibility strategy, audio/input bridge, safe-area handling, touch controls, external keyboard/mouse, and controller support.
-5. **Launch profile / plan** — first pass implemented in `App/Versions/MinecraftLaunchPlan.swift`. It decodes Mojang JVM/game arguments (including legacy `minecraftArguments`), evaluates OS/architecture/feature rules, resolves common placeholders, constructs a Java classpath, converts `-cp` to the `java.class.path` VM property for a future JNI-created VM, and reports missing Java/native/runtime prerequisites. It does not execute Java. **Game process supervisor** remains unimplemented; add log streaming, cancellation, pause/stop and lifecycle only after the JNI game entry point exists.
+5. **Launch profile / plan** — implemented as an inspectable first pass in `App/Versions/MinecraftLaunchPlan.swift`. It decodes modern JVM/game arguments and legacy `minecraftArguments`, evaluates OS/architecture/feature rules, resolves common and legacy placeholders (`auth_session`, `game_assets`, user-properties fallbacks), constructs a Java classpath, converts `-cp` to the `java.class.path` VM property for a future JNI-created VM, and reports missing Java/native/runtime prerequisites. Unsafe library and logging paths are rejected; offline identity uses Java-compatible version-3 UUIDs. The builder does not execute Java. **Game process supervisor** remains unimplemented; add log streaming, cancellation, pause/stop and lifecycle only after the JNI game entry point exists.
 6. **Loader installers** — Forge/Fabric/Quilt are not implemented. Add only after vanilla can launch and runtime compatibility has been tested.
 
 ## JIT and performance
@@ -34,10 +34,10 @@ Status: **the unsigned generic iOS arm64 Xcode build passed in GitHub Actions bu
 
 ## Current installer limitations
 - The installer downloads the vanilla version JSON, client JAR, Java artifact libraries, asset index, and asset objects.
-- The first launch-plan builder is dependency-injected for tests and has an installed-profile entry point. It produces an inspectable plan but deliberately reports blockers until a matching complete runtime, native renderer/LWJGL layer, and persistent game-JVM bridge exist.
-- It deliberately does not download native classifiers, because desktop native libraries are not compatible with iOS.
-- It does not yet perform Mojang argument/rule resolution, install a JRE, authenticate a Microsoft account, prepare the final classpath, launch Java, or install Forge/Fabric.
-- The installer needs device testing and a review of older versions and special library metadata before it is considered production-ready.
+- The launch-plan builder is dependency-injected for tests and has an installed-profile entry point. It produces an inspectable plan but deliberately reports blockers until a matching complete runtime, native renderer/LWJGL layer, and persistent game-JVM bridge exist. The CI smoke suite covers modern and legacy arguments, OS/feature rules, placeholders, Java version matching, identity validation, and unsafe metadata paths.
+- The installer deliberately does not download desktop native classifiers, because desktop native libraries are not compatible with iOS.
+- The launch-plan builder resolves Mojang argument/rule metadata and prepares a candidate classpath, but it does not install a JRE, authenticate a Microsoft account, launch Java, or install Forge/Fabric.
+- Older versions that require `assets/virtual/legacy` are detected, but the installer does not yet materialize that virtual asset tree. The installer still needs device testing and review of older versions and special library metadata before it is considered production-ready.
 
 ## Distribution and "install directly" requirement
 - Hineka will not require ESign or KSign.

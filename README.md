@@ -9,10 +9,11 @@ Current development label: **0.1-dev** (not a release).
 - `App/Hineka/` — SwiftUI app entry point and initial tab/navigation shell.
 - `App/Wallet/` — Coin package model and draft Wallet screen.
 - `App/Runtime/` — experimental OpenJDK Mobile Zero JNI bridge and Java smoke test.
-- `App/Versions/` — Mojang version-manifest browser and first-pass vanilla client/library/asset downloader.
+- `App/Versions/` — Mojang version-manifest browser, vanilla installer, launch-plan builder, and readiness checks.
 - `App/Library/` — local .jar/.zip file import, inventory, enable flags, and delete controls.
 - `Package.swift` — iOS 18 Swift package for the HinekaUI source.
 - `Scripts/prepare-openjdk-ios-runtime.sh` — downloads and SHA-256 verifies pinned OpenJDK Mobile device runtime inputs for the Java smoke test.
+- `Scripts/MinecraftLaunchPlanSmokeTests.swift` — host-run smoke tests for Minecraft launch-plan parsing and validation.
 - `Docs/MONETIZATION-PLAN.md` — Coin packages, Premium, and payment requirements.
 - `Docs/API-DRAFT.md` — proposed backend API contract.
 - `Docs/SECURITY-PLAN.md` — security design notes.
@@ -38,10 +39,10 @@ Requested card brands: Viettel, MobiFone, and Zing. They are **not integrated**.
 - Import local `.jar` mods and `.zip` resource packs into Hineka's private app storage, list them, mark them enabled/disabled, and delete them.
 - Local library metadata is stored in the app container.
 
-The downloader intentionally skips desktop native classifiers. It does not yet install an iOS JRE, construct the final classpath/JVM arguments, authenticate a Minecraft account, launch a game, install Forge/Fabric, scan mods for malware, or apply mod toggles to a running game. The remote mod catalogue remains demo-only.
+The downloader intentionally skips desktop native classifiers. A separate launch-plan builder now resolves modern and legacy Mojang JVM/game arguments, evaluates OS/architecture/feature rules, replaces supported placeholders, and constructs an inspectable classpath. It does not execute Java. The project still lacks a complete Minecraft-compatible iOS JRE, native renderer/LWJGL replacement, persistent JNI game supervisor, Microsoft authentication, Forge/Fabric installation, mod malware scanning, and live application of mod toggles. Legacy virtual assets are detected as a blocker until the installer creates their compatibility layout. The remote mod catalogue remains demo-only.
 
 ## Build and runtime status
 
-This repository currently contains a SwiftUI source package, an early launcher shell, a first-pass vanilla asset downloader, and an experimental JNI bridge around the OpenJDK Mobile Zero VM. The bridge exposes a Java smoke-test control on Home; it has not yet been run on a physical iPhone/iPad. The pinned package contains only the upstream HelloWorld-style Java base-module image, not the complete set of Java modules or iOS native graphics needed by Minecraft. The game renderer, Minecraft launch pipeline, Forge/Fabric installation, authentication, backend, and real payments are not implemented. Runtime redistribution is blocked pending an AGPL-3.0/provenance review. GitHub Actions now prepares the pinned runtime and attempts an unsigned generic iOS-device build; no successful Xcode build has yet been confirmed. The app has not been installed on a device or packaged as an IPA.
+GitHub Actions build #56 completed successfully on 2026-11-17: all 11 Minecraft launch-plan smoke tests passed, XcodeGen generated the project, and Xcode built the generic iOS device target with code signing disabled. This confirms source compilation only. The experimental JNI bridge exposes a Java smoke-test control on Home, but it has not yet been run on a physical iPhone/iPad. The pinned package contains only the upstream HelloWorld-style Java base-module image, not the complete Java modules or iOS native graphics needed by Minecraft. The launch-plan builder does not launch a game. Runtime execution, renderer/LWJGL replacement, Forge/Fabric, Microsoft authentication, backend, and real payments are not implemented. Runtime redistribution is blocked pending an AGPL-3.0/provenance review. The app has not been signed, installed on a device, or packaged as an IPA.
 
 Add the Swift files to an iOS App target in Xcode, then build and test on supported devices before calling it installable. Do not distribute a release IPA until runtime licensing, security, signing, and device testing are completed.
