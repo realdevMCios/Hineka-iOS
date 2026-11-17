@@ -92,6 +92,16 @@ for item in matches:
     print(" -", item.get("LibraryIdentifier"), item.get("LibraryPath"))
 PY
 
+# SwiftPM's local binaryTarget path is fixed in Package.swift.
+# Copy the verified XCFramework to that exact path before resolving the package.
+SWIFT_PACKAGE_FRAMEWORK="${WORK_DIR}/OpenJDK.xcframework"
+rm -rf "$SWIFT_PACKAGE_FRAMEWORK"
+ditto "$FRAMEWORK_DIR" "$SWIFT_PACKAGE_FRAMEWORK"
+if [[ ! -s "$SWIFT_PACKAGE_FRAMEWORK/Info.plist" ]]; then
+  echo "Failed to stage OpenJDK.xcframework at the Swift Package binaryTarget path." >&2
+  exit 1
+fi
+
 # The iOS-tools HelloWorld instructions bundle java.base as <resource>/lib/modules.
 cp -f "$MODULES_FILE" "${RESOURCE_DIR}/lib/modules"
 
@@ -131,5 +141,5 @@ Not a complete Minecraft runtime; not an IPA; not signed.
 EOF
 
 echo "Prepared pinned OpenJDK inputs:"
-ls -lh "${FRAMEWORK_DIR}/Info.plist" "${RESOURCE_DIR}/lib/modules" "$JAR_PATH"
+ls -lh "${SWIFT_PACKAGE_FRAMEWORK}/Info.plist" "${RESOURCE_DIR}/lib/modules" "$JAR_PATH"
 echo "Runtime preparation complete. This does not prove that Hineka can run Minecraft."
