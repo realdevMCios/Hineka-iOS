@@ -51,6 +51,15 @@ jobs:
             swiftc -frontend -parse "${source}"
           done < <(find App -type f -name '*.swift' -print0)
 
+      - name: Run Minecraft launch-plan smoke tests
+        run: |
+          swiftc \
+            App/Versions/MinecraftVersionInstaller.swift \
+            App/Versions/MinecraftLaunchPlan.swift \
+            Scripts/MinecraftLaunchPlanSmokeTests.swift \
+            -o "${RUNNER_TEMP}/hineka-launch-plan-tests"
+          "${RUNNER_TEMP}/hineka-launch-plan-tests"
+
       - name: Install XcodeGen
         run: brew install xcodegen
 

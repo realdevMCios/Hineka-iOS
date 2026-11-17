@@ -190,7 +190,7 @@ public enum HinekaGameLaunchPlanBuilder {
         expectedAssetIndexID: String? = nil,
         screenWidth: Int = 1170,
         screenHeight: Int = 2532,
-        operatingSystemName: String = "osx",
+        operatingSystemName: String = "ios",
         architecture: String = "aarch64",
         operatingSystemVersion: String = ProcessInfo.processInfo.operatingSystemVersionString,
         features: [String: Bool] = [:]
