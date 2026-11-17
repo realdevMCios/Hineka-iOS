@@ -1,4 +1,5 @@
-import Foundation\nimport CryptoKit
+import Foundation
+import CryptoKit
 
 public struct HinekaLaunchReadiness: Identifiable {
     public var id: String { versionID }
