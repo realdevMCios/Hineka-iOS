@@ -51,7 +51,7 @@ The future supervisor owns one long-lived game VM session and exposes:
 - stop: request cooperative shutdown, then report the actual exit result;
 - cleanup: release renderer/audio/input resources after the JVM has stopped.
 
-The current HinekaJavaRuntime.runSmokeTest() creates a short-lived VM, invokes a tiny Java method and destroys the VM. It must not be reused as a game session runner. HinekaGameSessionStateMachine is only the tested lifecycle contract; it does not start or stop Java.
+The current HinekaJavaRuntime.runSmokeTest() creates a short-lived VM, invokes a tiny Java method and destroys the VM. It must not be reused as a game session runner. HinekaGameSessionStateMachine is only the tested lifecycle contract; it does not start or stop Java. It now requires a passing HinekaGameStartupPreflightReport to transition from preparing to starting; a failed report moves the session to failed.
 
 ## First vertical-slice acceptance plan
 

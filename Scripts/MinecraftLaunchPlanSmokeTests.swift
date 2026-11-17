@@ -69,16 +69,19 @@ private struct MinecraftLaunchPlanSmokeTests {
         try testSessionMachineFailureAndReset()
         try testSessionMachineRejectsInvalidStart()
         try testSessionMachineRejectsStopWhileIdle()
+        try testSessionMachineBlocksFailedPreflight()
+        try testSessionMachineRejectsPreflightOutsidePreparing()
         try testRendererManifestRejectsReferenceOnlyBackend()
         try testRendererManifestAcceptsVerifiedIOSArm64Backend()
         try testRendererManifestRejectsChecksumMismatch()
         try testRendererManifestRejectsNonIOSMachO()
         try testRendererManifestRejectsUnsupportedJavaMajor()
         try testRendererManifestRejectsUnsafeArtifactPath()
+        try testRendererManifestRejectsBackendManifestMismatch()
         try testPreflightRejectsIncompleteRuntime()
         try testPreflightPreservesLaunchPlanBlockers()
         try testPreflightRejectsMissingBackendRegistration()
-        print("Hineka launch-plan, asset, runtime, session, renderer and preflight tests: 34/34 passed")
+        print("Hineka launch-plan, asset, runtime, gated session, renderer and preflight tests: 37/37 passed")
     }
 
     private static func expect(_ condition: @autoclosure () -> Bool, _ message: String) throws {
@@ -683,6 +686,26 @@ private struct MinecraftLaunchPlanSmokeTests {
                    "Unsafe native artifact path was not rejected.")
     }
 
+    private static func testRendererManifestRejectsBackendManifestMismatch() throws {
+        let fixture = try RendererFixture()
+        defer { fixture.remove() }
+        let artifact = try fixture.writeArtifact(makeIOSArm64MachO())
+        let verifiedManifest = fixture.manifest(artifact: artifact, status: .integrated)
+        let registeredManifest = fixture.manifest(
+            artifact: artifact,
+            status: .integrated,
+            supportedJavaMajorVersions: [21]
+        )
+        let result = HinekaRendererManifestValidator.validate(
+            manifest: verifiedManifest,
+            backend: TestRendererBackend(manifest: registeredManifest),
+            rendererDirectory: fixture.root,
+            requiredJavaMajorVersion: 17
+        )
+        try expect(result.blockers.contains(where: { $0.contains("không khớp đầy đủ manifest") }),
+                   "Backend with a different manifest was accepted.")
+    }
+
     private static func testPreflightRejectsIncompleteRuntime() throws {
         let fixture = try RendererFixture()
         defer { fixture.remove() }
@@ -784,6 +807,21 @@ private struct MinecraftLaunchPlanSmokeTests {
         func shutdown() throws {}
     }
 
+    private static func makePassingPreflightReport() throws -> HinekaGameStartupPreflightReport {
+        let fixture = try RendererFixture()
+        defer { fixture.remove() }
+        let artifact = try fixture.writeArtifact(makeIOSArm64MachO())
+        let manifest = fixture.manifest(artifact: artifact, status: .integrated)
+        let runtime = try makeCompleteRuntimeReport(javaMajor: 17)
+        return HinekaGameStartupPreflight.evaluate(
+            requiredJavaMajorVersion: 17,
+            runtime: runtime,
+            rendererManifest: manifest,
+            rendererBackend: TestRendererBackend(manifest: manifest),
+            rendererDirectory: fixture.root
+        )
+    }
+
     private static func makeCompleteRuntimeReport(
         javaMajor: Int,
         modules: Set<String> = HinekaJavaRuntimeReport.minecraftBaselineModules
@@ -830,8 +868,9 @@ private struct MinecraftLaunchPlanSmokeTests {
         var machine = HinekaGameSessionStateMachine()
         let preparing = try machine.apply(.beginPreparation)
         try expect(preparing == .preparing, "Session did not enter preparing.")
-        let starting = try machine.apply(.runtimeReady)
-        try expect(starting == .starting, "Session did not enter starting.")
+        let preflight = try makePassingPreflightReport()
+        let starting = try machine.completePreflight(preflight)
+        try expect(starting == .starting, "Passing preflight did not enter starting.")
         let running = try machine.apply(.didStart)
         try expect(running == .running, "Session did not enter running.")
         let exited = try machine.apply(.didExit(0))
@@ -843,7 +882,7 @@ private struct MinecraftLaunchPlanSmokeTests {
     private static func testSessionMachineStopPath() throws {
         var machine = HinekaGameSessionStateMachine()
         try machine.apply(.beginPreparation)
-        try machine.apply(.runtimeReady)
+        try machine.completePreflight(makePassingPreflightReport())
         try machine.apply(.didStart)
         let stopping = try machine.apply(.requestStop)
         try expect(stopping == .stopping, "Stop request did not enter stopping.")
@@ -858,6 +897,31 @@ private struct MinecraftLaunchPlanSmokeTests {
         try expect(failed == .failed("runtime missing"), "Preparation failure was not retained.")
         let reset = try machine.apply(.reset)
         try expect(reset == .idle, "Terminal failure did not reset to idle.")
+    }
+
+    private static func testSessionMachineBlocksFailedPreflight() throws {
+        var machine = HinekaGameSessionStateMachine()
+        try machine.apply(.beginPreparation)
+        let report = HinekaGameStartupPreflightReport(blockers: ["Renderer chưa tích hợp."])
+        let result = try machine.completePreflight(report)
+        try expect(result == .failed(report.summary), "Failed preflight did not block the session.")
+        do {
+            try machine.apply(.didStart)
+            throw LaunchPlanTestFailure(description: "A failed preflight allowed the game to start.")
+        } catch HinekaGameSessionStateMachineError.invalidTransition {
+            // Expected.
+        }
+    }
+
+    private static func testSessionMachineRejectsPreflightOutsidePreparing() throws {
+        var machine = HinekaGameSessionStateMachine()
+        do {
+            try machine.completePreflight(makePassingPreflightReport())
+            throw LaunchPlanTestFailure(description: "Preflight completed while the session was idle.")
+        } catch HinekaGameSessionStateMachineError.invalidTransition {
+            // Expected.
+        }
+        try expect(machine.state == .idle, "Invalid preflight call changed the idle state.")
     }
 
     private static func testSessionMachineRejectsInvalidStart() throws {

@@ -97,8 +97,8 @@ public enum HinekaRendererManifestValidator {
             blockers.append("Chưa đăng ký HinekaRendererBackend cho renderer này.")
         }
         if let registeredBackend = backend,
-           registeredBackend.manifest.identifier != manifest.identifier {
-            blockers.append("Backend được đăng ký không khớp renderer manifest.")
+           registeredBackend.manifest != manifest {
+            blockers.append("Manifest của backend được đăng ký không khớp đầy đủ manifest đã xác minh.")
         }
 
         if !manifest.supportedJavaMajorVersions.contains(requiredJavaMajorVersion) {
@@ -287,6 +287,11 @@ public enum HinekaRendererArtifactError: LocalizedError {
 public struct HinekaGameStartupPreflightReport {
     public let blockers: [String]
     public var canStart: Bool { blockers.isEmpty }
+
+    public init(blockers: [String]) {
+        var seen = Set<String>()
+        self.blockers = blockers.filter { seen.insert($0).inserted }
+    }
 
     public var summary: String {
         if canStart {

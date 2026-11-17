@@ -44,7 +44,7 @@ public enum HinekaGameSessionState: Equatable, CustomStringConvertible {
 
 public enum HinekaGameSessionEvent: Equatable {
     case beginPreparation
-    case runtimeReady
+    case preflightChecked
     case didStart
     case requestStop
     case didExit(Int32)
@@ -64,19 +64,33 @@ public enum HinekaGameSessionStateMachineError: LocalizedError {
 }
 
 /// A deterministic state machine for the future game process supervisor.
-/// Only a native/JNI supervisor may report runtimeReady, didStart, didExit or didFail.
+/// The preflight report is mandatory before this machine can enter the starting state.
 public struct HinekaGameSessionStateMachine {
     public private(set) var state: HinekaGameSessionState = .idle
 
     public init() {}
+
+    /// Completes preparation only when runtime, renderer and launch-plan checks all pass.
+    /// A failed report moves the session to a terminal failed state and never reaches starting.
+    @discardableResult
+    public mutating func completePreflight(
+        _ report: HinekaGameStartupPreflightReport
+    ) throws -> HinekaGameSessionState {
+        guard state == .preparing else {
+            throw HinekaGameSessionStateMachineError.invalidTransition(
+                from: state,
+                event: .preflightChecked
+            )
+        }
+        state = report.canStart ? .starting : .failed(report.summary)
+        return state
+    }
 
     @discardableResult
     public mutating func apply(_ event: HinekaGameSessionEvent) throws -> HinekaGameSessionState {
         switch (state, event) {
         case (.idle, .beginPreparation):
             state = .preparing
-        case (.preparing, .runtimeReady):
-            state = .starting
         case (.starting, .didStart):
             state = .running
         case (.starting, .requestStop), (.running, .requestStop):
