@@ -79,8 +79,8 @@ public final class HinekaLocalLibraryStore: ObservableObject {
                 throw HinekaLocalLibraryError.invalidFileType(expected: kind.expectedExtension)
             }
 
-            let values = try sourceURL.resourceValues(forKeys: [.fileSizeKey, .isRegularFileKey])
-            guard values.isRegularFile == true else {
+            let values = try sourceURL.resourceValues(forKeys: [.fileSizeKey, .isRegularFileKey, .isSymbolicLinkKey])
+            guard values.isRegularFile == true, values.isSymbolicLink != true else {
                 throw HinekaLocalLibraryError.notRegularFile
             }
             guard let fileSize = values.fileSize, fileSize > 0 else {
