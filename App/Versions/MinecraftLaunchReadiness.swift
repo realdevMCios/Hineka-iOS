@@ -130,9 +130,18 @@ public enum MinecraftLaunchReadinessChecker {
             missingAssetCount = 1
         }
 
-        let nativeClassifierCount = metadata.libraries.filter {
-            $0.natives != nil || !($0.downloads?.classifiers?.isEmpty ?? true)
-        }.count
+        let nativeClassifierCount = metadata.libraries.reduce(into: 0) { count, library in
+            if library.natives != nil {
+                count += 1
+            } else {
+                let nativeKeys = library.downloads?.classifiers?.keys.filter {
+                    $0.hasPrefix("natives-")
+                } ?? []
+                if !nativeKeys.isEmpty {
+                    count += 1
+                }
+            }
+        }
 
         var blockers: [String] = []
         if !fileManager.fileExists(atPath: clientURL.path) {
