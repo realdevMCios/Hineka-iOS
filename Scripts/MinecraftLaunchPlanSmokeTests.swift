@@ -196,13 +196,32 @@ private struct MinecraftLaunchPlanSmokeTests {
         var metadata = baseMetadata()
         metadata.removeValue(forKey: "arguments")
         metadata["minecraftArguments"] =
-            "--username ${auth_player_name} --server \"play.example.net\" --width ${resolution_width}"
+            "--username ${auth_player_name} --session ${auth_session} --server \"play.example.net\" " +
+            "--assetsDir ${game_assets} --userProperties ${user_properties} " +
+            "--profileProperties ${profile_properties} --width ${resolution_width}"
+        let identity = try HinekaLaunchIdentity(
+            username: "HinekaTester",
+            uuid: "12345678-1234-4234-8234-123456789abc",
+            accessToken: "legacy-session-token",
+            isAuthenticated: true
+        )
 
-        let plan = try build(fixture, metadata: metadata)
+        let plan = try build(fixture, metadata: metadata, identity: identity)
         try expect(argumentValue("--server", in: plan.gameArguments) == "play.example.net",
                    "Quoted legacy argument was not preserved as one token.")
         try expect(argumentValue("--username", in: plan.gameArguments) == "HinekaTester",
                    "Legacy player placeholder was not replaced.")
+        try expect(argumentValue("--session", in: plan.gameArguments) == "legacy-session-token",
+                   "Legacy auth_session placeholder was not replaced.")
+        try expect(argumentValue("--assetsDir", in: plan.gameArguments) ==
+                   fixture.assetsDirectory.appendingPathComponent("virtual/legacy").path,
+                   "Legacy game_assets directory was not resolved.")
+        try expect(argumentValue("--userProperties", in: plan.gameArguments) == "{}",
+                   "Fallback user properties were not supplied.")
+        try expect(argumentValue("--profileProperties", in: plan.gameArguments) == "{}",
+                   "Fallback profile properties were not supplied.")
+        try expect(plan.blockers.contains(where: { $0.contains("legacy virtual assets") }),
+                   "Missing legacy virtual assets directory was not reported.")
     }
 
     private static func testUnresolvedPlaceholderIsReported() throws {

@@ -300,11 +300,15 @@ public enum HinekaGameLaunchPlanBuilder {
             "version_name": metadata.id,
             "game_directory": workingDirectory.path,
             "assets_root": assetsDirectory.path,
+            "game_assets": assetsDirectory.appendingPathComponent("virtual/legacy", isDirectory: true).path,
             "assets_index_name": assetIndexID,
             "auth_uuid": identity.uuid,
             "auth_access_token": identity.accessToken,
+            "auth_session": identity.accessToken,
             "clientid": identity.clientID ?? "",
             "auth_xuid": identity.xuid ?? "",
+            "user_properties": "{}",
+            "profile_properties": "{}",
             "user_type": identity.userType,
             "version_type": metadata.type ?? "release",
             "natives_directory": libraryPath,
@@ -398,6 +402,11 @@ public enum HinekaGameLaunchPlanBuilder {
         } else {
             rawGameArguments = []
             blockers.append("Metadata không có game arguments kiểu mới hoặc minecraftArguments kiểu cũ.")
+        }
+        let legacyAssetsDirectory = assetsDirectory.appendingPathComponent("virtual/legacy", isDirectory: true)
+        if rawGameArguments.contains(where: { $0.contains("$"+"{game_assets}") }) &&
+            !FileManager.default.fileExists(atPath: legacyAssetsDirectory.path) {
+            blockers.append("Profile dùng legacy virtual assets nhưng thư mục assets/virtual/legacy chưa được tạo.")
         }
         let gameArguments = rawGameArguments.map {
             substitute($0, values: substitutions, unresolved: &blockers)
