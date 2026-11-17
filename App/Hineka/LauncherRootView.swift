@@ -134,6 +134,17 @@ private struct HomeDashboardView: View {
                     }
 
                     NavigationLink {
+                        HinekaMetalSurfaceProbeScreen()
+                    } label: {
+                        Label("Thử bề mặt Metal", systemImage: "viewfinder")
+                            .font(.headline)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(16)
+                            .background(.background, in: RoundedRectangle(cornerRadius: 16))
+                    }
+                    .buttonStyle(.plain)
+
+                    NavigationLink {
                         SkinStudioView()
                     } label: {
                         Label("Skin Studio", systemImage: "person.crop.square")

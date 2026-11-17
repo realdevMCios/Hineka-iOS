@@ -1,6 +1,6 @@
 # Hineka iOS renderer and game-session architecture
 
-Status: **interface contract and preflight validation implemented; no production renderer integrated**. Hineka now defines a backend protocol and rejects native artifacts that are not checksum-verified iOS arm64 Mach-O binaries. No patched LWJGL native, SDL bridge, game JVM supervisor, or physical-device graphics test has been integrated.
+Status: **interface contract, preflight validation, and a standalone Metal surface probe implemented; no production Minecraft renderer integrated**. Hineka now defines a backend protocol, rejects native artifacts that are not checksum-verified iOS arm64 Mach-O binaries, and contains an MTKView triangle test to exercise a native iOS render surface. No patched LWJGL native, SDL bridge, game JVM supervisor, or physical-device graphics test has been integrated.
 
 ## Why this is a separate subsystem
 
@@ -58,10 +58,11 @@ The current HinekaJavaRuntime.runSmokeTest() creates a short-lived VM, invokes a
 Start with one pinned profile rather than claiming every Minecraft version at once. The current test fixtures use Minecraft 1.20.4 / Java 17 as a convenient first investigation target; this is not yet a user-facing compatibility promise.
 
 1. Build and inspect a full iOS arm64 Java runtime for the target major version; verify all required modules and licensing.
-2. Prove a Java-created iOS surface can clear and present a frame using the selected renderer.
-3. Prove keyboard, pointer, touch and audio lifecycle independently of Minecraft.
-4. Launch a minimal Java main class through the long-lived supervisor and test start/stop/error/log events.
-5. Only then try the official vanilla client for the pinned profile, followed by a clean world load and measured performance.
+2. Run the Metal Surface Probe on a signed physical device; confirm its triangle is visible and the presented-frame counter increments. This validates only the native Metal surface, not Java/LWJGL integration.
+3. Prove a Java-created iOS surface can clear and present a frame using the selected renderer.
+4. Prove keyboard, pointer, touch and audio lifecycle independently of Minecraft.
+5. Launch a minimal Java main class through the long-lived supervisor and test start/stop/error/log events.
+6. Only then try the official vanilla client for the pinned profile, followed by a clean world load and measured performance.
 
 ## Release gates
 
