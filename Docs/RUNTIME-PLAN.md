@@ -1,6 +1,6 @@
 # Hineka Java runtime and installation plan
 
-Status: experimental Java smoke-test bridge is integrated in source; it has not yet been built successfully by Xcode or run on an iPhone/iPad. The full Minecraft-compatible Java runtime, iOS native libraries, renderer, and game launch are not implemented.
+Status: **the unsigned generic iOS arm64 Xcode build passed in GitHub Actions build #52 (2026-11-17)**. The Java smoke-test bridge is integrated in source, but it has not yet been run on a signed physical iPhone/iPad. The full Minecraft-compatible Java runtime, iOS native libraries, renderer, and game launch are not implemented.
 
 ## Non-negotiable project boundaries
 - This is the separate **Hineka iOS** project. Do not modify `realdevMCios/test-script` or any other unrelated repository.
@@ -10,17 +10,16 @@ Status: experimental Java smoke-test bridge is integrated in source; it has not 
 - Preserve OpenJDK Mobile's `LICENSE`, `ASSEMBLY_EXCEPTION`, and `ADDITIONAL_LICENSE_INFO` with any future runtime artifact. The experimental script currently builds for evaluation only; do not ship the generated static library until its complete license and linkage obligations are reviewed.
 
 ## OpenJDK Mobile Zero smoke-test integration
-
 - Hineka now has a first **JNI smoke-test integration** using the upstream `openjdk-mobile/ios-tools` snapshot. The Objective-C bridge calls `loadfunctions()`, starts `JNI_CreateJavaVM`, invokes `HinekaRuntimeSmokeTest.run()`, collects its output, and shuts down this short-lived test VM.
 - The Swift wrapper locates the staged `lib/modules` image and test JAR from its Swift Package resource bundle. Home has a development-only **Thử chạy Java** control. It is a Java startup test only and does not start Minecraft.
 - `Scripts/prepare-openjdk-ios-runtime.sh` downloads `OpenJDK.xcframework.zip` and `java_bundle-device.zip` from the upstream `snapshot` release, checks the published SHA-256 digests, verifies that the XCFramework contains an iOS arm64 device slice, stages `lib/modules`, and compiles the smoke-test JAR with Java 17-compatible bytecode.
 - The pinned release asset digests are recorded in the script. The snapshot assets were uploaded in March 2026; they are not the same as rebuilding the newer upstream source tree updated in September 2026. This is a reproducible **proof-of-concept dependency**, not a claim that the artifact is the latest OpenJDK Mobile build.
 - The upstream `openjdk-mobile/ios-tools` repository is licensed AGPL-3.0. Its build tree includes `symbol_keeper.cpp` in the static runtime link. The exact obligations for redistributing this prebuilt XCFramework with Hineka have **not** been legally reviewed. Keep this integration experimental and do not publish or distribute a bundled runtime until the license/provenance has been reviewed and the required notices/source-offer obligations are clear.
-- The CI bootstrap first compiles and runs the Java smoke-test JAR on the macOS host, then prepares the pinned runtime inputs and compiles an unsigned generic iOS device target. Those checks validate the Java source/JAR and app link step, but do not prove that the Java VM starts on hardware; that still needs a signed development build and a real iPhone/iPad test.
+- GitHub Actions build **#52** passed all steps, including `xcodebuild` for a generic iOS device target with code signing disabled. The Java smoke-test JAR is run on the macOS CI host; this is not a test of the JVM on an iPhone/iPad. A signed device build and real-device test are still required.
 
 ## Runtime architecture
 1. **Version manifest and vanilla downloader** — implemented in this repository as an early first pass. It retrieves Mojang metadata, verifies the metadata SHA-1, downloads the selected client JAR, Maven Java library artifacts, asset index, and asset objects, then writes a Hineka installed marker.
-2. **Java runtime provider** — an upstream OpenJDK Mobile Zero image and a minimal JNI smoke-test bridge are now wired into source. The app must still build and run on a physical device before this counts as a working runtime. A complete Minecraft-compatible JRE/module set for the selected Java major versions is not yet verified.
+2. **Java runtime provider** — an upstream OpenJDK Mobile Zero image and a minimal JNI smoke-test bridge are wired into source. The app must still build and run on a physical device before this counts as a working runtime. A complete Minecraft-compatible JRE/module set for the selected Java major versions is not yet verified.
 3. **Native library layer** — not implemented. Minecraft libraries with Linux/macOS/Windows native classifiers cannot be treated as iOS binaries. Hineka needs specifically built iOS arm64-compatible native components and license review.
 4. **Graphics and input bridge** — not implemented. Define a renderer surface, OpenGL compatibility strategy, audio/input bridge, safe-area handling, touch controls, external keyboard/mouse, and controller support.
 5. **Launch profile and process supervisor** — not implemented. Build a classpath and JVM arguments from validated version metadata, apply profile-specific mods/resource packs, capture logs, support cancellation, and cleanly stop the Java process.
