@@ -46,13 +46,15 @@ private struct MinecraftLaunchPlanSmokeTests {
         try testOfflineIdentityValidation()
         try testModernArgumentsAndClasspath()
         try testIOSRuleFilteringIsTheDefault()
+        try testConditionalFeatureRules()
         try testNativeLibrariesRemainBlocked()
         try testLegacyArgumentTokenization()
         try testUnresolvedPlaceholderIsReported()
         try testUnsafeLibraryPathIsRejected()
+        try testUnsafeLoggingPathIsRejected()
         try testAssetIndexMismatchIsRejected()
         try testRuntimeMismatchIsReported()
-        print("Hineka launch-plan smoke tests: 9/9 passed")
+        print("Hineka launch-plan smoke tests: 11/11 passed")
     }
 
     private static func expect(_ condition: @autoclosure () -> Bool, _ message: String) throws {
@@ -62,7 +64,10 @@ private struct MinecraftLaunchPlanSmokeTests {
     private static func testOfflineIdentityValidation() throws {
         let first = try HinekaLaunchIdentity.offline(username: "Hineka_01")
         let second = try HinekaLaunchIdentity.offline(username: "Hineka_01")
+        let notch = try HinekaLaunchIdentity.offline(username: "Notch")
         try expect(first.uuid == second.uuid, "Offline UUID must be deterministic.")
+        try expect(notch.uuid == "b50ad385-829d-3141-a216-7e7d7539ba7f",
+                   "Offline UUID must match Java's nameUUIDFromBytes algorithm.")
         try expect(!first.isAuthenticated && first.accessToken.isEmpty, "Offline identity must not claim authentication.")
 
         do {
@@ -135,6 +140,29 @@ private struct MinecraftLaunchPlanSmokeTests {
         try expect(plan.classpath.count == 2, "Windows-only library was incorrectly included for iOS.")
         try expect(!plan.blockers.contains(where: { $0.contains("windows-only") }),
                    "Skipped Windows library should not become a missing-file blocker.")
+    }
+
+    private static func testConditionalFeatureRules() throws {
+        let fixture = try LaunchPlanFixture()
+        defer { fixture.remove() }
+        var metadata = baseMetadata()
+        metadata["arguments"] = [
+            "jvm": [["value": "-Xmx2G"]],
+            "game": [
+                [
+                    "rules": [["action": "allow", "features": ["is_demo_user": true]]],
+                    "value": "--demo"
+                ],
+                [
+                    "rules": [["action": "allow", "features": ["is_demo_user": false]]],
+                    "value": "--standard"
+                ]
+            ]
+        ]
+
+        let plan = try build(fixture, metadata: metadata)
+        try expect(plan.gameArguments == ["--standard"],
+                   "Conditional Minecraft feature rules were not evaluated.")
     }
 
     private static func testNativeLibrariesRemainBlocked() throws {
@@ -210,6 +238,30 @@ private struct MinecraftLaunchPlanSmokeTests {
         do {
             _ = try build(fixture, metadata: metadata)
             throw LaunchPlanTestFailure(description: "Path traversal library was accepted.")
+        } catch HinekaGameLaunchPlanError.unsafePath {
+            // Expected.
+        }
+    }
+
+    private static func testUnsafeLoggingPathIsRejected() throws {
+        let fixture = try LaunchPlanFixture()
+        defer { fixture.remove() }
+        var metadata = baseMetadata()
+        metadata["logging"] = [
+            "client": [
+                "argument": "-Dlog4j.configurationFile=${path}",
+                "file": [
+                    "id": "../../outside.xml",
+                    "sha1": String(repeating: "0", count: 40),
+                    "size": 1,
+                    "url": "https://piston-meta.mojang.com/logs/outside.xml"
+                ]
+            ]
+        ]
+
+        do {
+            _ = try build(fixture, metadata: metadata)
+            throw LaunchPlanTestFailure(description: "Path traversal logging config was accepted.")
         } catch HinekaGameLaunchPlanError.unsafePath {
             // Expected.
         }

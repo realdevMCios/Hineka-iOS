@@ -62,8 +62,10 @@ public struct HinekaLaunchIdentity {
         guard isValidUsername(username) else {
             throw HinekaGameLaunchPlanError.invalidUsername
         }
-        let digest = Array(Insecure.MD5.hash(data: Data("OfflinePlayer:\(username)".utf8)))
-        let bytes = Array(digest.prefix(16))
+        var bytes = Array(Insecure.MD5.hash(data: Data("OfflinePlayer:\(username)".utf8)))
+        // Match java.util.UUID.nameUUIDFromBytes: RFC-4122 version 3 and variant bits.
+        bytes[6] = (bytes[6] & 0x0f) | 0x30
+        bytes[8] = (bytes[8] & 0x3f) | 0x80
         let uuid = UUID(uuid: (
             bytes[0], bytes[1], bytes[2], bytes[3],
             bytes[4], bytes[5], bytes[6], bytes[7],
@@ -334,9 +336,8 @@ public enum HinekaGameLaunchPlanBuilder {
             .flatMap { $0.value.strings } ?? []
 
         if let logging = metadata.logging?.client {
-            let logFile = assetsDirectory
-                .appendingPathComponent("log_configs", isDirectory: true)
-                .appendingPathComponent(logging.file.id)
+            let logRoot = assetsDirectory.appendingPathComponent("log_configs", isDirectory: true)
+            let logFile = try safeDestination(root: logRoot, relativePath: logging.file.id)
             if FileManager.default.fileExists(atPath: logFile.path) {
                 substitutions["path"] = logFile.path
                 if let argument = logging.argument {
