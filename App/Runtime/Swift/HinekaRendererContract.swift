@@ -93,10 +93,11 @@ public enum HinekaRendererManifestValidator {
         if manifest.integrationStatus != .integrated {
             blockers.append("Renderer \(manifest.displayName) chưa được tích hợp thành backend Hineka.")
         }
-        guard let backend else {
+        if backend == nil {
             blockers.append("Chưa đăng ký HinekaRendererBackend cho renderer này.")
         }
-        if let backend, backend.manifest.identifier != manifest.identifier {
+        if let registeredBackend = backend,
+           registeredBackend.manifest.identifier != manifest.identifier {
             blockers.append("Backend được đăng ký không khớp renderer manifest.")
         }
 
@@ -203,7 +204,10 @@ public enum HinekaRendererManifestValidator {
             return (false, "Mach-O không phải dynamic library hoặc bundle")
         }
 
-        let commandCount = Int(readUInt32(data, at: 16))
+        guard let commandCountValue = readUInt32(data, at: 16) else {
+            return (false, "Mach-O thiếu số lượng load command")
+        }
+        let commandCount = Int(commandCountValue)
         var offset = 32
         var foundIOSPlatform = false
         for _ in 0..<commandCount {
@@ -312,7 +316,9 @@ public enum HinekaGameStartupPreflight {
         if !(normalizedOS.contains("ios") || normalizedOS.contains("iphone")) {
             blockers.append("Java runtime báo hệ điều hành \(runtime.osName), không phải iOS.")
         }
-        if !runtime.is64BitARM || !architectureMatches(architecture, runtime.architecture) {
+        let targetArchitecture = architecture.lowercased()
+        let targetIsARM64 = targetArchitecture == "arm64" || targetArchitecture == "aarch64"
+        if !runtime.is64BitARM || !targetIsARM64 {
             blockers.append("Java runtime không chạy trên iOS arm64.")
         }
         if !runtime.hasBaselineModuleCoverage {
