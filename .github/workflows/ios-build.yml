@@ -51,6 +51,14 @@ jobs:
             swiftc -frontend -parse "${source}"
           done < <(find App -type f -name '*.swift' -print0)
 
+      - name: Run local library safety smoke tests
+        run: |
+          swiftc \
+            App/Library/HinekaLocalLibraryStore.swift \
+            Scripts/LocalLibrarySmokeTests.swift \
+            -o "${RUNNER_TEMP}/hineka-local-library-tests"
+          "${RUNNER_TEMP}/hineka-local-library-tests"
+
       - name: Run Minecraft launch-plan smoke tests
         run: |
           swiftc \
