@@ -64,7 +64,12 @@ private struct MinecraftLaunchPlanSmokeTests {
         try testRuntimeReportFindsMissingModules()
         try testRuntimeReportRejectsMalformedOutput()
         try testRuntimeReportRejectsMissingJavaBase()
-        print("Hineka launch-plan, asset, and runtime diagnostics tests: 20/20 passed")
+        try testSessionMachineHappyPath()
+        try testSessionMachineStopPath()
+        try testSessionMachineFailureAndReset()
+        try testSessionMachineRejectsInvalidStart()
+        try testSessionMachineRejectsStopWhileIdle()
+        print("Hineka launch-plan, asset, runtime, and session-state tests: 25/25 passed")
     }
 
     private static func expect(_ condition: @autoclosure () -> Bool, _ message: String) throws {
@@ -557,6 +562,60 @@ private struct MinecraftLaunchPlanSmokeTests {
         processors=6
         modules=\(modules)
         """
+    }
+
+    private static func testSessionMachineHappyPath() throws {
+        var machine = HinekaGameSessionStateMachine()
+        let preparing = try machine.apply(.beginPreparation)
+        try expect(preparing == .preparing, "Session did not enter preparing.")
+        let starting = try machine.apply(.runtimeReady)
+        try expect(starting == .starting, "Session did not enter starting.")
+        let running = try machine.apply(.didStart)
+        try expect(running == .running, "Session did not enter running.")
+        let exited = try machine.apply(.didExit(0))
+        try expect(exited == .exited(0), "Successful process exit was not recorded.")
+        try expect(!machine.state.isActive && machine.state.isTerminal,
+                   "Exited session must be terminal and inactive.")
+    }
+
+    private static func testSessionMachineStopPath() throws {
+        var machine = HinekaGameSessionStateMachine()
+        try machine.apply(.beginPreparation)
+        try machine.apply(.runtimeReady)
+        try machine.apply(.didStart)
+        let stopping = try machine.apply(.requestStop)
+        try expect(stopping == .stopping, "Stop request did not enter stopping.")
+        let exited = try machine.apply(.didExit(143))
+        try expect(exited == .exited(143), "Stopped process exit code was not retained.")
+    }
+
+    private static func testSessionMachineFailureAndReset() throws {
+        var machine = HinekaGameSessionStateMachine()
+        try machine.apply(.beginPreparation)
+        let failed = try machine.apply(.didFail("runtime missing"))
+        try expect(failed == .failed("runtime missing"), "Preparation failure was not retained.")
+        let reset = try machine.apply(.reset)
+        try expect(reset == .idle, "Terminal failure did not reset to idle.")
+    }
+
+    private static func testSessionMachineRejectsInvalidStart() throws {
+        var machine = HinekaGameSessionStateMachine()
+        do {
+            try machine.apply(.didStart)
+            throw LaunchPlanTestFailure(description: "Session started without preparation.")
+        } catch HinekaGameSessionStateMachineError.invalidTransition {
+            // Expected.
+        }
+    }
+
+    private static func testSessionMachineRejectsStopWhileIdle() throws {
+        var machine = HinekaGameSessionStateMachine()
+        do {
+            try machine.apply(.requestStop)
+            throw LaunchPlanTestFailure(description: "Idle session accepted a stop request.")
+        } catch HinekaGameSessionStateMachineError.invalidTransition {
+            // Expected.
+        }
     }
 
     private static func baseMetadata() -> [String: Any] {

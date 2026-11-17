@@ -8,7 +8,7 @@ Current development label: **0.1-dev** (not a release).
 
 - `App/Hineka/` — SwiftUI app entry point and initial tab/navigation shell.
 - `App/Wallet/` — Coin package model and draft Wallet screen.
-- `App/Runtime/` — experimental OpenJDK Mobile Zero JNI bridge and Java smoke test.
+- `App/Runtime/` — experimental OpenJDK Mobile Zero JNI bridge, runtime module diagnostics, and game-session lifecycle contract.
 - `App/Versions/` — Mojang version-manifest browser, vanilla installer, launch-plan builder, and readiness checks.
 - `App/Library/` — local .jar/.zip file import, inventory, enable flags, and delete controls.
 - `Package.swift` — iOS 18 Swift package for the HinekaUI source.
@@ -18,6 +18,7 @@ Current development label: **0.1-dev** (not a release).
 - `Docs/API-DRAFT.md` — proposed backend API contract.
 - `Docs/SECURITY-PLAN.md` — security design notes.
 - `Docs/RUNTIME-PLAN.md` — runtime, JIT, licensing, and installation approach.
+- `Docs/RENDERER-PLAN.md` — clean renderer, input/audio and game-session architecture research.
 
 ## Current Coin top-up draft
 
