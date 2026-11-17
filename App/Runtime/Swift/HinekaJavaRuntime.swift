@@ -24,6 +24,11 @@ public enum HinekaJavaRuntimeError: LocalizedError {
 /// Experimental wrapper around the upstream OpenJDK Mobile Zero VM.
 /// It only runs a short HelloWorld-style diagnostic; it is not a Minecraft launcher runtime.
 public enum HinekaJavaRuntime {
+    public static func inspectRuntime() throws -> HinekaJavaRuntimeReport {
+        let output = try runSmokeTest()
+        return try HinekaJavaRuntimeReport.parse(output)
+    }
+
     public static func runSmokeTest() throws -> String {
         guard let resourceURL = Bundle.module.resourceURL else {
             throw HinekaJavaRuntimeError.missingResources

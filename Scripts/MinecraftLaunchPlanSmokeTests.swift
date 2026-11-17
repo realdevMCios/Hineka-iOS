@@ -60,7 +60,11 @@ private struct MinecraftLaunchPlanSmokeTests {
         try testUnsafeAssetNamesAreRejected()
         try testCorruptAssetObjectsAreRejected()
         try testNonCompatibilityIndexesAreNoOps()
-        print("Hineka launch-plan and asset compatibility smoke tests: 16/16 passed")
+        try testRuntimeReportParsesCompleteModuleInventory()
+        try testRuntimeReportFindsMissingModules()
+        try testRuntimeReportRejectsMalformedOutput()
+        try testRuntimeReportRejectsMissingJavaBase()
+        print("Hineka launch-plan, asset, and runtime diagnostics tests: 20/20 passed")
     }
 
     private static func expect(_ condition: @autoclosure () -> Bool, _ message: String) throws {
@@ -474,6 +478,85 @@ private struct MinecraftLaunchPlanSmokeTests {
         func remove() {
             try? FileManager.default.removeItem(at: root)
         }
+    }
+
+    private static func testRuntimeReportParsesCompleteModuleInventory() throws {
+        let modules = HinekaJavaRuntimeReport.minecraftBaselineModules.sorted().joined(separator: ",")
+        let output = runtimeReport(
+            javaVersion: "24.0.1",
+            javaMajor: "24",
+            vmName: "OpenJDK 64-Bit Zero VM",
+            architecture: "aarch64",
+            modules: modules
+        )
+        let report = try HinekaJavaRuntimeReport.parse(output)
+        try expect(report.javaMajorVersion == 24, "Runtime Java major was not parsed.")
+        try expect(report.is64BitARM, "ARM64 architecture was not detected.")
+        try expect(report.isZeroVM, "OpenJDK Zero VM was not identified.")
+        try expect(report.hasBaselineModuleCoverage, "Complete baseline module set was marked incomplete.")
+        try expect(report.missingBaselineModules.isEmpty, "Unexpected missing baseline modules.")
+        try expect(report.summary.contains("chưa có JIT"), "Zero interpreter warning was not displayed.")
+    }
+
+    private static func testRuntimeReportFindsMissingModules() throws {
+        let output = runtimeReport(
+            javaVersion: "24.0.1",
+            javaMajor: "24",
+            vmName: "OpenJDK 64-Bit Zero VM",
+            architecture: "arm64",
+            modules: "java.base,java.logging"
+        )
+        let report = try HinekaJavaRuntimeReport.parse(output)
+        try expect(!report.hasBaselineModuleCoverage, "Incomplete module image was marked complete.")
+        try expect(report.missingBaselineModules.contains("java.desktop"),
+                   "Missing java.desktop module was not reported.")
+        try expect(report.missingBaselineModules.contains("jdk.unsupported"),
+                   "Missing jdk.unsupported module was not reported.")
+    }
+
+    private static func testRuntimeReportRejectsMalformedOutput() throws {
+        do {
+            _ = try HinekaJavaRuntimeReport.parse("not a runtime report")
+            throw LaunchPlanTestFailure(description: "Malformed runtime report was accepted.")
+        } catch HinekaJavaRuntimeReportError.invalidFormat {
+            // Expected.
+        }
+    }
+
+    private static func testRuntimeReportRejectsMissingJavaBase() throws {
+        let output = runtimeReport(
+            javaVersion: "24.0.1",
+            javaMajor: "24",
+            vmName: "OpenJDK 64-Bit Zero VM",
+            architecture: "aarch64",
+            modules: "java.logging,java.xml"
+        )
+        do {
+            _ = try HinekaJavaRuntimeReport.parse(output)
+            throw LaunchPlanTestFailure(description: "A runtime without java.base was accepted.")
+        } catch HinekaJavaRuntimeReportError.missingJavaBase {
+            // Expected.
+        }
+    }
+
+    private static func runtimeReport(
+        javaVersion: String,
+        javaMajor: String,
+        vmName: String,
+        architecture: String,
+        modules: String
+    ) -> String {
+        """
+        HINEKA_RUNTIME_REPORT=1
+        java.version=\(javaVersion)
+        java.major=\(javaMajor)
+        vm.name=\(vmName)
+        vm.info=interpreted mode
+        os.name=iOS
+        os.arch=\(architecture)
+        processors=6
+        modules=\(modules)
+        """
     }
 
     private static func baseMetadata() -> [String: Any] {

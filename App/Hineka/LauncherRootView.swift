@@ -156,7 +156,8 @@ private struct HomeDashboardView: View {
         defer { isTestingJavaRuntime = false }
 
         do {
-            javaRuntimeOutput = try HinekaJavaRuntime.runSmokeTest()
+            let report = try HinekaJavaRuntime.inspectRuntime()
+            javaRuntimeOutput = report.summary
         } catch {
             javaRuntimeOutput = "Java smoke test failed:\n" + error.localizedDescription
         }

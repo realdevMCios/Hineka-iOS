@@ -27,8 +27,9 @@ Status: **GitHub Actions build #56 passed on 2026-11-17**, including 16 launch-p
 
 ## JIT and performance
 - Amethyst's own public README states that its iOS Minecraft Java launcher uses JIT to reach usable performance, and describes separate installation/JIT paths. This is a technical warning, not permission to copy its privileged configuration.
-- The first prototype is the tiny Java JNI smoke test described above. The next proof point is to run it on a physical device, inspect the reported Java/VM version, and only then evaluate whether the pinned runtime can support Minecraft's Java requirements. Benchmark frame rate and memory; Zero interpretation may be too slow for a playable experience.
-- The smoke-test JAR is compiled with Java 17-compatible bytecode, but that alone does not prove the bundled VM's exact version or compatibility with Minecraft 8/17/21 requirements. The test reports the actual VM version; separate runtimes may be required.
+- The first prototype is the Java JNI smoke test described above. Its report now enumerates the real boot-layer modules and reports the actual Java major, VM name/info, OS and architecture from the VM that started. CI parses the report model with synthetic complete/incomplete inventories; only a physical device run can tell us what this pinned bundle really exposes. The module baseline is an engineering diagnostic, not a complete per-version compatibility guarantee.
+- Benchmark frame rate and memory on a signed physical device; the OpenJDK Mobile Zero VM is interpreter-only, so performance may be too low for playable Minecraft.
+- The smoke-test JAR is compiled with Java 17-compatible bytecode, but that alone does not prove the bundled VM's exact version or compatibility with a Minecraft profile's required Java major. The device diagnostic reports the actual runtime major and boot modules; separate runtimes may be required.
 - If an authorized JIT route is ever considered, document the exact supported Apple signing/debug mechanism or approved installation channel. Do not manufacture private entitlements or bypass platform code-signing and sandbox protections.
 - Do not advertise "Minecraft Java works" until a clean device test has launched a real game world.
 
