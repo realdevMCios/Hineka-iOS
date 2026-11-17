@@ -16,6 +16,7 @@ struct MinecraftVersionInstallerError: LocalizedError {
     static let invalidDownloadURL = Self(message: "Manifest chứa URL tải xuống không hợp lệ hoặc không thuộc máy chủ được phép.")
     static let missingIntegrityMetadata = Self(message: "Manifest thiếu SHA-1 hoặc dung lượng để xác minh tệp.")
     static let insufficientDiskSpace = Self(message: "Thiết bị không đủ dung lượng trống để cài phiên bản Minecraft này.")
+    static let invalidMetadataSize = Self(message: "Metadata chứa dung lượng tệp không hợp lệ hoặc vượt giới hạn tính toán.")
 }
 
 struct MinecraftVersionMetadata: Decodable {
@@ -196,12 +197,21 @@ public final class MinecraftVersionInstaller: ObservableObject {
 
             // The game needs a complete asset index and all referenced objects.
             // Estimate required storage before starting large downloads.
-            let estimatedLibraryBytes = artifacts.dropFirst().reduce(Int64(0)) { partial, item in
-                partial + max(0, item.3 ?? 0)
+            guard
+                let assetIndexSize = assetInfo.size,
+                let totalAssetSize = assetInfo.totalSize,
+                assetIndexSize >= 0,
+                totalAssetSize >= 0
+            else {
+                throw MinecraftVersionInstallerError.missingIntegrityMetadata
             }
-            let estimatedClientBytes = max(0, client.size ?? 0)
-            let estimatedAssetBytes = max(0, assetInfo.totalSize ?? 0)
-            let estimatedBytes = estimatedLibraryBytes + estimatedClientBytes + estimatedAssetBytes
+            let artifactSizes = artifacts.compactMap { $0.3 }
+            guard artifactSizes.count == artifacts.count else {
+                throw MinecraftVersionInstallerError.missingIntegrityMetadata
+            }
+            let estimatedBytes = try Self.checkedTotalSize(
+                artifactSizes + [assetIndexSize, totalAssetSize]
+            )
             try Self.requireAvailableSpace(
                 in: appMinecraftDirectory(),
                 estimatedBytes: estimatedBytes
@@ -243,6 +253,9 @@ public final class MinecraftVersionInstaller: ObservableObject {
             statusMessage = "Đang tải Asset Index…"
             let assetIndexData = try await Self.fetchData(from: assetInfo.url)
             try Self.verify(data: assetIndexData, expectedSHA1: assetInfo.sha1)
+            guard Int64(assetIndexData.count) == assetIndexSize else {
+                throw MinecraftVersionInstallerError.sizeMismatch
+            }
             let assetIndex = try JSONDecoder().decode(MinecraftAssetIndex.self, from: assetIndexData)
 
             let assetIndexID = assetInfo.id ?? metadata.assets ?? versionID
@@ -404,6 +417,10 @@ public final class MinecraftVersionInstaller: ObservableObject {
         }
 
         let (temporaryURL, response) = try await URLSession.shared.download(from: url)
+        defer {
+            try? FileManager.default.removeItem(at: temporaryURL)
+        }
+
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
             throw MinecraftVersionInstallerError(message: "Không tải được \(url.lastPathComponent).")
         }
@@ -461,6 +478,21 @@ public final class MinecraftVersionInstaller: ObservableObject {
               allowedMinecraftHosts.contains(host) else {
             throw MinecraftVersionInstallerError.invalidDownloadURL
         }
+    }
+
+    private nonisolated static func checkedTotalSize(_ sizes: [Int64]) throws -> Int64 {
+        var total: Int64 = 0
+        for size in sizes {
+            guard size >= 0 else {
+                throw MinecraftVersionInstallerError.invalidMetadataSize
+            }
+            let (next, overflow) = total.addingReportingOverflow(size)
+            guard !overflow else {
+                throw MinecraftVersionInstallerError.invalidMetadataSize
+            }
+            total = next
+        }
+        return total
     }
 
     private func requireAvailableSpace(in directory: URL, estimatedBytes: Int64) throws {
