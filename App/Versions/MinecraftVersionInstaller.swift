@@ -198,19 +198,19 @@ public final class MinecraftVersionInstaller: ObservableObject {
             // The game needs a complete asset index and all referenced objects.
             // Estimate required storage before starting large downloads.
             guard
-                let assetIndexSize = assetInfo.size,
-                let totalAssetSize = assetInfo.totalSize,
-                assetIndexSize >= 0,
-                totalAssetSize >= 0
+                (assetInfo.size ?? 0) >= 0,
+                (assetInfo.totalSize ?? 0) >= 0
             else {
-                throw MinecraftVersionInstallerError.missingIntegrityMetadata
+                throw MinecraftVersionInstallerError.invalidMetadataSize
             }
+            let assetIndexSize = assetInfo.size
+            let totalAssetSize = assetInfo.totalSize ?? 0
             let artifactSizes = artifacts.compactMap { $0.3 }
             guard artifactSizes.count == artifacts.count else {
                 throw MinecraftVersionInstallerError.missingIntegrityMetadata
             }
             let estimatedBytes = try Self.checkedTotalSize(
-                artifactSizes + [assetIndexSize, totalAssetSize]
+                artifactSizes + [assetIndexSize ?? 0, totalAssetSize]
             )
             try Self.requireAvailableSpace(
                 in: appMinecraftDirectory(),
@@ -253,7 +253,7 @@ public final class MinecraftVersionInstaller: ObservableObject {
             statusMessage = "Đang tải Asset Index…"
             let assetIndexData = try await Self.fetchData(from: assetInfo.url)
             try Self.verify(data: assetIndexData, expectedSHA1: assetInfo.sha1)
-            guard Int64(assetIndexData.count) == assetIndexSize else {
+            if let assetIndexSize, Int64(assetIndexData.count) != assetIndexSize {
                 throw MinecraftVersionInstallerError.sizeMismatch
             }
             let assetIndex = try JSONDecoder().decode(MinecraftAssetIndex.self, from: assetIndexData)
