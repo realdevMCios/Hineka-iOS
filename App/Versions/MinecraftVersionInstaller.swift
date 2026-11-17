@@ -44,10 +44,64 @@ struct MinecraftVersionMetadata: Decodable {
         let classifiers: [String: VerifiedDownload]?
     }
 
+    struct OperatingSystemRule: Decodable {
+        let name: String?
+        let arch: String?
+        let version: String?
+    }
+
+    struct ArgumentRule: Decodable {
+        let action: String
+        let os: OperatingSystemRule?
+        let features: [String: Bool]?
+    }
+
+    enum ArgumentValue: Decodable {
+        case single(String)
+        case multiple([String])
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.singleValueContainer()
+            if let value = try? container.decode(String.self) {
+                self = .single(value)
+                return
+            }
+            if let values = try? container.decode([String].self) {
+                self = .multiple(values)
+                return
+            }
+            throw DecodingError.typeMismatch(
+                ArgumentValue.self,
+                DecodingError.Context(
+                    codingPath: decoder.codingPath,
+                    debugDescription: "Minecraft argument value must be a string or an array of strings."
+                )
+            )
+        }
+
+        var strings: [String] {
+            switch self {
+            case .single(let value): return [value]
+            case .multiple(let values): return values
+            }
+        }
+    }
+
+    struct ConditionalArgument: Decodable {
+        let rules: [ArgumentRule]?
+        let value: ArgumentValue
+    }
+
+    struct LaunchArguments: Decodable {
+        let game: [ConditionalArgument]?
+        let jvm: [ConditionalArgument]?
+    }
+
     struct Library: Decodable {
         let name: String
         let downloads: LibraryDownloads?
         let natives: [String: String]?
+        let rules: [ArgumentRule]?
     }
 
     struct JavaVersion: Decodable {
@@ -57,11 +111,14 @@ struct MinecraftVersionMetadata: Decodable {
 
     let id: String
     let mainClass: String
+    let type: String?
     let assets: String?
     let assetIndex: AssetIndexInfo?
     let downloads: VersionDownloads
     let libraries: [Library]
     let javaVersion: JavaVersion?
+    let arguments: LaunchArguments?
+    let minecraftArguments: String?
 
     struct LoggingInfo: Decodable {
         struct Client: Decodable {
