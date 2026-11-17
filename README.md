@@ -7,22 +7,30 @@ Current development label: **0.1-dev** (not a release).
 ## Source layout
 
 - `App/Hineka/` — SwiftUI app entry point and initial tab/navigation shell.
-- `App/Wallet/` — Coin package model and draft Wallet screen.
+- `App/Wallet/` — Hineka Coin package model and draft Wallet screen.
 - `App/Runtime/` — experimental OpenJDK Mobile Zero JNI bridge, runtime module diagnostics, renderer backend contract, startup preflight gate, and game-session lifecycle contract.
-- `App/Hineka/HinekaMetalSurfaceProbeView.swift` — standalone Metal triangle surface probe; not a Minecraft renderer.
 - `App/Hineka/HinekaMetalSurfaceProbeView.swift` — native Metal triangle probe using MTKView; a graphics-surface test, not a Minecraft renderer.
 - `App/Versions/` — Mojang version-manifest browser, vanilla installer, launch-plan builder, and readiness checks.
 - `App/Library/` — local .jar/.zip file import, inventory, enable flags, and delete controls.
 - `Package.swift` — iOS 18 Swift package for the HinekaUI source.
 - `Scripts/prepare-openjdk-ios-runtime.sh` — downloads and SHA-256 verifies pinned OpenJDK Mobile device runtime inputs for the Java smoke test.
 - `Scripts/MinecraftLaunchPlanSmokeTests.swift` — host-run smoke tests for Minecraft launch-plan parsing and validation.
-- `Docs/MONETIZATION-PLAN.md` — Coin packages, Premium, and payment requirements.
+- `Docs/MONETIZATION-PLAN.md` — Hineka-only monetization boundaries; no Minecraft account resale.
+- `Docs/ACCOUNT-LINKING-PLAN.md` — planned bring-your-own-license account-linking safety requirements.
 - `Docs/API-DRAFT.md` — proposed backend API contract.
 - `Docs/SECURITY-PLAN.md` — security design notes.
 - `Docs/RUNTIME-PLAN.md` — runtime, JIT, licensing, and installation approach.
 - `Docs/RENDERER-PLAN.md` — clean renderer, input/audio and game-session architecture research.
 
-## Current Coin top-up draft
+## Product and account boundary
+
+Hineka is an independent third-party launcher, not an official Minecraft or Microsoft product. Hineka must not sell, broker, transfer, rent, share, or deliver Minecraft/Microsoft accounts or their credentials. Users must bring a Minecraft license/account they personally control, obtained through official or explicitly authorized channels. Microsoft/Minecraft account linking and Java entitlement verification are planned only; they are not implemented.
+
+See [Docs/MONETIZATION-PLAN.md](Docs/MONETIZATION-PLAN.md) and [Docs/ACCOUNT-LINKING-PLAN.md](Docs/ACCOUNT-LINKING-PLAN.md).
+
+## Hineka Coin top-up draft
+
+These are Hineka-only catalogue credits, **not** Minecraft accounts, licenses, or game access. The values remain an unimplemented draft:
 
 | Top-up | Coins |
 |---:|---:|
@@ -33,7 +41,7 @@ Current development label: **0.1-dev** (not a release).
 | 500,000 VND | 900 |
 | 1,000,000 VND | 1,800 |
 
-Requested card brands: Viettel, MobiFone, and Zing. They are **not integrated**. Purchase controls remain disabled until a lawful payment route, provider account, and server verification are in place.
+Viettel, MobiFone, and Zing are not integrated. Purchase controls must remain disabled until a lawful payment route, provider account, and server verification are in place.
 
 ## Launcher code added in 0.1-dev
 

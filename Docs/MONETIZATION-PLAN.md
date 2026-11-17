@@ -1,17 +1,48 @@
 # Hineka monetization plan
 
-Status: product specification only. The storefront, top-up gateway, and server-side Coins ledger are not implemented yet.
+Status: design only. No real-money store, Microsoft account linking, or payment backend is implemented.
 
-## Product scope
-- Product: **Hineka iOS**, a launcher for Minecraft Java on iPhone/iPad. Coins and Premium belong to Hineka's launcher catalogue; they are not Minecraft Java accounts or Mojang/Microsoft licenses.
-- Remove the Link4M / watch-or-visit-links-to-earn-Coins feature entirely.
-- Coins are credited only after a paid transaction is verified by Hineka's server. There are no task/ad rewards.
-- Premium target price: **100,000 VND for one month**. Before selling, choose fixed 30-day access or an auto-renewing subscription and state renewal/cancellation clearly.
-- Keep basic launcher features available without payment.
+## Important product boundary: Minecraft Premium accounts are not for resale
 
-## Coin top-up catalogue
+Hineka must **not** sell, broker, transfer, rent, share, or deliver Minecraft Premium / Microsoft accounts or their login credentials.
 
-The owner's confirmed mapping is **top-up denomination in VND → Coins credited**:
+Minecraft Help says buying and selling Minecraft accounts goes against its Terms of Service and that third-party account purchases do not make the buyer the legitimate owner of the license. Microsoft's Services Agreement also says Microsoft account credentials cannot be transferred to another user or entity. Hineka is not an authorized Minecraft account reseller.
+
+- Do not create a Minecraft-account inventory, account listing, account checkout, or account-delivery endpoint.
+- Do not collect, display, send, or store Microsoft passwords, one-time codes, recovery codes, session cookies, or seller-provided account credentials.
+- Do not promise that a third-party account is permanent, transferable, recoverable, or safe from suspension.
+- Users should obtain Minecraft from Minecraft/Microsoft or a retailer explicitly authorized to sell the relevant product, using an account they control.
+- Do not sell gift cards, activation codes, or licenses as a workaround unless Hineka later has written authorization from the relevant issuer/reseller program and a separate legal/platform review.
+
+References:
+- [Minecraft Help: Can I Buy or Sell Minecraft Accounts?](https://help.minecraft.net/hc/en-us/articles/360042692852-Posso-comprar-ou-vender-contas-do-Minecraft)
+- [Microsoft Services Agreement, section 4.a.i](https://www.microsoft.com/en/servicesagreement)
+- [Minecraft EULA](https://www.minecraft.net/en-us/eula)
+
+## What Hineka may offer instead
+
+### 1. Bring-your-own Minecraft license
+
+- A user obtains and controls their own legitimate Minecraft account/license through official channels.
+- Hineka may add Microsoft/Minecraft account linking only through an official, currently supported authentication flow after its requirements have been researched and reviewed.
+- The user authenticates with Microsoft through the approved sign-in surface. Hineka must never ask the user to type a Microsoft password or one-time code into a Hineka form or send those credentials to Hineka support.
+- The app may display only the minimum account/profile and license-entitlement status returned through the approved flow. A successful sign-in alone must not be described as proof of a Java Edition license.
+- Account linking is not implemented yet. See [ACCOUNT-LINKING-PLAN.md](ACCOUNT-LINKING-PLAN.md).
+
+### 2. Hineka Premium (separate from Minecraft Premium)
+
+- Previous target price: **100,000 VND / month**, still only a draft.
+- This is for Hineka launcher features only. It must never claim to include Minecraft Java Edition, a Microsoft account, or a Minecraft license.
+- Possible paid Hineka features: additional cloud storage for permitted mods/resource packs, launcher themes, and advanced profile-management tools.
+- Basic launcher functionality and the ability to use a user's own licensed Minecraft copy should not be paywalled.
+- Decide fixed 30-day access vs auto-renewing subscription before implementation. Explain price, renewal, cancellation, expiry, and refunds clearly.
+- For an App Store build, digital subscriptions/features generally require Apple In-App Purchase under the applicable App Review rules. No external checkout should be enabled unless the exact storefront/program/entitlement permits it.
+
+### 3. Hineka Coins (optional future catalogue currency)
+
+Coins, if retained, are Hineka-only catalogue credits. They are **not** Minecraft currency, a Minecraft license, an account, or a way to unlock Minecraft itself. They may only be used for permitted Hineka catalogue items such as mods/resource packs where the author/license permits the sale or redistribution.
+
+Draft denomination mapping (not live):
 
 | Top-up denomination | Coins credited |
 |---:|---:|
@@ -22,63 +53,34 @@ The owner's confirmed mapping is **top-up denomination in VND → Coins credited
 | 500,000 VND | 900 Coins |
 | 1,000,000 VND | 1,800 Coins |
 
-- These are owner-approved draft catalogue values. They are not live payment products until each provider/store mapping and server verification are configured.
-- Show a package as purchasable only when its denomination, Coin grant, provider product/configuration, and server verification are all configured.
-- Reconcile a submitted card against the provider's confirmed denomination/value before granting the mapped Coins.
-- Keep all balances in integer Coins; never use floating point for the ledger.
+Do not activate any package until its lawful payment route, provider/store mapping, server verification, refunds, and local-law review are complete. If Coins are not needed for the launch, remove the Wallet purchase UI rather than presenting a nonfunctional shop.
 
-## Mod catalogue: Chinese Java mods
-- This catalogue is for Minecraft Java mods used through Hineka iOS. Each listing must state supported Minecraft version, loader (Forge/Fabric/other), mod version, author, source, license, file hash, and compatibility notes.
-- The owner wants Coin prices to vary with mod quality, from polished/high-quality Chinese mods to simpler/low-quality mods. Set each mod's price individually; do not automatically price by nationality.
-- Quality labels (for example Featured / Recommended / Basic) are editorial labels and must be separate from the Coin price.
-- Show the exact Coin price before confirmation. Do not sell or mirror a mod unless its license/author permits redistribution. Otherwise link to the official author/project download.
+## Mod/resource-pack catalogue
+
+- Each listing must state supported Minecraft version, loader (Forge/Fabric/other), mod/resource-pack version, author, source, license, file hash, size, and compatibility notes.
+- Do not price by nationality. Set an individual price only where the license/author permits commercial distribution.
+- Do not sell or mirror a file unless its license or explicit author permission permits it. Otherwise link to the official author/project download.
 - Scan files for malware and validate archive/file type, size, and compatibility before making them available.
-- Do not sell pirated, unauthorized, or modified-without-permission files. Coins must not be required for basic launcher functionality or for Minecraft itself.
+- Never bundle Minecraft game files, paid game content, account credentials, or unauthorized modified game clients.
 
-## Requested top-up methods and iOS distribution rules
+## Payments and platform requirements
 
-### Requested card types
-- The owner requested **Viettel, MobiFone, and Zing prepaid cards**.
-- These are not integrated yet. Hineka needs a legitimate payment/top-up provider, a merchant agreement/account, API documentation, fee and denomination schedule, callback/status verification, and a completed legal/security review before activation.
-- A public API guide from a third-party card-exchange gateway is not itself proof that Hineka has an approved merchant account, that the provider is trustworthy, or that fees/settlement are acceptable. Do not hard-code a provider URL or credentials into the iOS app.
-- Card PIN/serial must never be sent in chat, logs, analytics, or crash reports. If a lawful provider is selected, collect it only through a secure HTTPS backend flow, protect it in transit, avoid persistent storage, and never expose partner secrets in the client. Handle rejected, pending, duplicate, underpaid, and mismatched-denomination transactions.
-- A parent/guardian must handle any merchant registration, contracts, settlement account, and financial obligations while the developer is a minor.
+- The earlier request for Viettel, MobiFone, and Zing prepaid-card top-ups remains unimplemented and is not approval to accept payments.
+- Any merchant setup, contracts, settlement account, payment credentials, and tax/legal obligations must be handled by a parent/guardian while the developer is a minor.
+- Keep provider secrets on a backend. Never let the iOS client decide a payment succeeded or grant a balance.
+- For App Store digital goods/features/subscriptions, follow the currently applicable Apple IAP requirements and region-specific programs. Re-check the guideline before release.
+- For direct distribution, do not assume that sideloading removes payment, consumer-protection, privacy, or licensing obligations.
 
-### If distributed through the iOS App Store
-- Digital Coins and Premium normally require Apple In-App Purchase / StoreKit. Apple Guideline 3.1.1 says in-app digital currencies, features, subscriptions, and digital vouchers must use IAP in the general case, with limited entitlements/region-specific programs. Do not put direct Viettel/MobiFone/Zing code redemption or an external checkout link into an App Store build unless Apple has approved the exact applicable entitlement/program and storefront.
-- Apple's current Vietnam Apple Account payment-method page lists Apple Account balance, MoMo, most credit/debit cards, ShopeePay, VNPAY, and ZaloPay. This describes ways customers can pay Apple; it does **not** mean Hineka can independently take MoMo/ZaloPay/card payments for its own digital Coins outside StoreKit.
-- Apple also says purchased IAP credits may not expire. The App Store build's StoreKit product IDs and server-side receipt verification must be configured before real purchases are enabled.
-- References: [Apple App Review Guidelines, section 3.1](https://developer.apple.com/app-store/review/guidelines/) and [Apple Account payment methods for Vietnam](https://support.apple.com/vi-vn/111741).
+## Security and customer support
 
-### If distributed outside the App Store (for example, a directly installed IPA)
-- Do not assume direct installation makes every payment flow lawful or safe. Viettel/MobiFone/Zing card redemption still requires a provider contract/API, anti-fraud controls, consumer disclosures, local-law review, and guardian-managed merchant setup.
-- Keep the payment-provider adapter on the server. The iOS client should only create a top-up intent and check its status; it must never decide that a card is valid or credit Coins by itself.
-- Keep App Store and direct-distribution payment configurations separated so an unsupported card-payment option cannot accidentally ship in the App Store build.
+- Never request Microsoft passwords, OTPs, recovery codes, card PINs/serials, or payment credentials in chat or support.
+- Keep entitlements and any Hineka Coin ledger server-authoritative.
+- Use unique transaction IDs, idempotency, callback verification, audit records, refunds/reversals, and a clear support process before enabling payments.
+- Disclose that Hineka is an independent third-party launcher and is not an official Minecraft/Microsoft product. Do not use Minecraft branding in a way that implies endorsement.
 
-## Server-side payment and Coins ledger
-- A top-up request gets a unique server-generated ID/idempotency key and a pending state.
-- Verify provider callbacks/signatures and query the provider server-to-server when needed. Do not trust screenshots, client callbacks, or user-entered success status.
-- Grant Coins only once, after the provider confirms success and the confirmed denomination exactly matches an enabled catalogue row.
-- Repeated callbacks/retries must never grant twice. Store provider transaction IDs uniquely.
-- Record every top-up, grant, spend, refund, rejection, and adjustment in an append-only audit ledger.
-- Reconcile refunds, reversals, chargebacks, and card disputes according to provider contract. Never leave reversed value spendable.
-- Never let the iOS client submit an arbitrary Coin quantity or edit a balance.
+## Pending decisions
 
-## Premium
-- Target price: **100,000 VND / one month**.
-- Choose fixed 30-day access or auto-renewing subscription before implementation.
-- Premium must have continuing, clearly described value (for example more cloud storage, launcher themes, or advanced profile tools); do not paywall basic launching or imply it supplies a Minecraft license.
-- Entitlements are server-authoritative and include start, expiry, renewal, cancellation, refund/revocation states.
-
-## Safety and UX
-- Display the exact price, Coins received, processing time/possible provider fees, and refund/support terms before a top-up confirmation.
-- Avoid promising instant credit when card processing can be pending.
-- Never ask a user to post card PIN, serial, OTP, payment credentials, or account passwords to support.
-- Require parent/guardian involvement for purchases and payment-provider contracts involving a minor.
-- Follow applicable platform age, privacy, consumer-protection, payment, and tax rules.
-
-## Pending owner decisions
-- [ ] Decide fixed 30-day Premium or auto-renewing 100,000 VND/month.
-- [ ] Select and vet a card-top-up provider; confirm its fees, payout rules, API status model, supported denominations, and contracts.
-- [ ] Confirm the actual distribution route for the iOS app: App Store, direct IPA, or separately configured builds.
-- [ ] Confirm legal permission and licenses for each paid Chinese Java mod listing.
+- [ ] Decide whether Hineka Coins are needed at all for the first release.
+- [ ] Decide which Hineka-only Premium features provide ongoing value and whether the 100,000 VND/month draft remains.
+- [ ] Research and implement only an official Microsoft/Minecraft account-linking flow; do not build an account marketplace.
+- [ ] Have a parent/guardian review contracts, platform rules, privacy, consumer law, tax, and payment setup before any sale.

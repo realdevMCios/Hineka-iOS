@@ -4,20 +4,29 @@ Status: design baseline for 0.1-dev. These controls are not implemented or secur
 
 ## Server-authoritative security
 - Treat the iOS client as untrusted.
-- Verify Premium entitlements, Coin balances, roles, and reward claims on the server.
+- Verify Hineka Premium entitlements, Coin balances, roles, and claims on the server.
 - Require authorization checks on every protected API route.
 - Never embed server secrets in the app.
+- A Microsoft/Minecraft login or entitlement status must not be forged by a client-provided boolean.
+
+## Microsoft/Minecraft account safety
+- Hineka is bring-your-own-license only; do not buy, sell, broker, transfer, rent, share, or deliver Minecraft/Microsoft accounts.
+- Use only an official supported sign-in and game-entitlement verification flow after its current requirements have been reviewed.
+- Never collect or store Microsoft passwords, OTPs, recovery codes, session cookies, or credentials received from sellers.
+- Use system/official authentication UI; protect any required tokens using iOS Keychain and minimum scopes/lifetimes.
+- Do not log tokens, account secrets, or sensitive profile data. Provide sign-out/unlink and clear local credentials.
+- A successful Microsoft sign-in alone does not prove ownership of Minecraft Java Edition.
 
 ## Anti-bypass and anti-bot
 - Reject expired or invalid sessions.
-- Rate-limit login, reward, upload, and sync endpoints.
+- Rate-limit login, upload, and sync endpoints.
 - Apply cooldowns and anomaly logging to repeated failures.
-- Do not trust client-side flags such as isPremium or rewardCompleted.
+- Do not trust client-side flags such as isPremium, ownsMinecraftJava, or uploadCompleted.
 
 ## Anti-replay and anti-dupe
 - Require idempotency keys for every mutating transaction.
-- Enforce database uniqueness for reward claims and transaction IDs.
-- Credit Coins atomically so retries cannot pay twice.
+- Enforce database uniqueness for transaction IDs and state-changing requests.
+- Credit Hineka Coins atomically so retries cannot pay twice.
 - Hash files server-side and deduplicate within the correct account/scope.
 - Use version/ETag checks to detect conflicting cloud-sync writes.
 - Validate temporary uploads before publishing them to the sync manifest.
@@ -36,9 +45,11 @@ Hineka can prevent duplicate reward claims, cloud uploads, and sync records. It 
 Keep the iOS sandbox and code-signing protections intact. Do not rely on private entitlements or security bypasses.
 
 ## Implementation checklist
-- [ ] Server-side sessions and authorization
-- [ ] Server-verified Premium and Coins ledger
-- [ ] Atomic, idempotent reward claims
+- [ ] Official Microsoft/Minecraft sign-in and Java entitlement verification
+- [ ] Secure token storage, revocation/unlink, and privacy controls
+- [ ] Server-side Hineka sessions and authorization
+- [ ] Server-verified Hineka Premium and Coins ledger
+- [ ] Atomic, idempotent transaction processing
 - [ ] Upload hashing and archive validation
 - [ ] Versioned sync and conflict handling
 - [ ] Rate limits, audit logs, and security tests
