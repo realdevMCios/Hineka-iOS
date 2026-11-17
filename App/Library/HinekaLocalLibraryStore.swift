@@ -79,17 +79,35 @@ public final class HinekaLocalLibraryStore: ObservableObject {
                 throw HinekaLocalLibraryError.invalidFileType(expected: kind.expectedExtension)
             }
 
-            let values = try sourceURL.resourceValues(forKeys: [.fileSizeKey])
-            let byteCount = Int64(values.fileSize ?? 0)
+            let values = try sourceURL.resourceValues(forKeys: [.fileSizeKey, .isRegularFileKey])
+            guard values.isRegularFile == true else {
+                throw HinekaLocalLibraryError.notRegularFile
+            }
+            guard let fileSize = values.fileSize, fileSize > 0 else {
+                throw HinekaLocalLibraryError.emptyFile
+            }
+
+            let byteCount = Int64(fileSize)
             guard byteCount <= maximumFileSize else {
                 throw HinekaLocalLibraryError.fileTooLarge
             }
+            try Self.validateZIPSignature(at: sourceURL)
 
             let folder = try directory(for: kind)
             let storedName = UUID().uuidString + "." + kind.expectedExtension
             let destinationURL = folder.appendingPathComponent(storedName, isDirectory: false)
 
             try fileManager.copyItem(at: sourceURL, to: destinationURL)
+
+            do {
+                let copiedValues = try destinationURL.resourceValues(forKeys: [.fileSizeKey])
+                guard copiedValues.fileSize == fileSize else {
+                    throw HinekaLocalLibraryError.copySizeMismatch
+                }
+            } catch {
+                try? fileManager.removeItem(at: destinationURL)
+                throw error
+            }
 
             let item = HinekaLocalFile(
                 id: UUID(),
@@ -101,7 +119,13 @@ public final class HinekaLocalLibraryStore: ObservableObject {
                 isEnabled: true
             )
             files.insert(item, at: 0)
-            try saveManifest()
+            do {
+                try saveManifest()
+            } catch {
+                files.removeAll { $0.id == item.id }
+                try? fileManager.removeItem(at: destinationURL)
+                throw error
+            }
             importedCount += 1
         }
 
@@ -126,6 +150,26 @@ public final class HinekaLocalLibraryStore: ObservableObject {
         try saveManifest()
     }
 
+    private static func validateZIPSignature(at url: URL) throws {
+        let handle = try FileHandle(forReadingFrom: url)
+        let signature: Data
+        do {
+            signature = try handle.read(upToCount: 4) ?? Data()
+            try handle.close()
+        } catch {
+            try? handle.close()
+            throw error
+        }
+
+        let acceptedSignatures = [
+            Data([0x50, 0x4B, 0x03, 0x04]),
+            Data([0x50, 0x4B, 0x05, 0x06]),
+            Data([0x50, 0x4B, 0x07, 0x08])
+        ]
+        guard acceptedSignatures.contains(signature) else {
+            throw HinekaLocalLibraryError.invalidArchiveSignature
+        }
+    }
     private func directory(for kind: HinekaLocalFileKind) throws -> URL {
         guard let support = fileManager.urls(
             for: .applicationSupportDirectory,
@@ -164,15 +208,27 @@ public final class HinekaLocalLibraryStore: ObservableObject {
 
 public enum HinekaLocalLibraryError: LocalizedError {
     case invalidFileType(expected: String)
+    case notRegularFile
+    case emptyFile
+    case invalidArchiveSignature
     case fileTooLarge
+    case copySizeMismatch
     case storageUnavailable
 
     public var errorDescription: String? {
         switch self {
         case .invalidFileType(let expected):
             return "Tệp không đúng định dạng .\(expected)."
+        case .notRegularFile:
+            return "Chỉ có thể nhập một tệp thông thường, không phải thư mục hoặc liên kết."
+        case .emptyFile:
+            return "Tệp rỗng hoặc không đọc được dung lượng."
+        case .invalidArchiveSignature:
+            return "Nội dung tệp không có chữ ký ZIP/JAR hợp lệ."
         case .fileTooLarge:
             return "Tệp vượt quá giới hạn 250 MB."
+        case .copySizeMismatch:
+            return "Dung lượng tệp sau khi sao chép không khớp tệp gốc."
         case .storageUnavailable:
             return "Không thể truy cập vùng lưu trữ của Hineka."
         }
