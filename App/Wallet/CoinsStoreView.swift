@@ -60,10 +60,13 @@ public struct CoinsStoreView: View {
         VStack(alignment: .leading, spacing: 6) {
             Text("Hineka Wallet")
                 .font(.title2.weight(.bold))
-            Text("Coin dùng cho nội dung và tiện ích trong launcher Minecraft Java.")
+            Text("Coin chỉ dùng cho nội dung và tiện ích Hineka được phép cung cấp trong launcher.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
-            Text("Số dư sẽ hiển thị khi tài khoản được kết nối máy chủ.")
+            Text("Coin không phải Minecraft Coins, không mua được Minecraft Java Edition hay tài khoản Minecraft Premium. Hineka không bán hoặc chuyển nhượng tài khoản Minecraft.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+            Text("Số dư sẽ hiển thị khi tài khoản Hineka được kết nối máy chủ.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
         }
