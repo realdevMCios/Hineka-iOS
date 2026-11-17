@@ -56,7 +56,7 @@ Request (conceptual; card fields are accepted only over TLS and only after an ap
 ```json
 {
   "provider": "viettel",
-  "denomination_vnd": 10000,
+  "denomination_vnd": 20000,
   "serial": "<entered securely>",
   "pin": "<entered securely>",
   "idempotency_key": "client-generated-unique-value"
