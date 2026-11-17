@@ -58,6 +58,7 @@ jobs:
             App/Versions/MinecraftLaunchPlan.swift \
             App/Runtime/Swift/HinekaRuntimeCapabilities.swift \
             App/Runtime/Swift/HinekaGameSessionStateMachine.swift \
+            App/Runtime/Swift/HinekaRendererContract.swift \
             Scripts/MinecraftLaunchPlanSmokeTests.swift \
             -o "${RUNNER_TEMP}/hineka-launch-plan-tests"
           "${RUNNER_TEMP}/hineka-launch-plan-tests"

@@ -1,6 +1,6 @@
 # Hineka iOS renderer and game-session architecture
 
-Status: **research and interface design only**. No renderer, patched LWJGL native, SDL bridge, game JVM supervisor, or physical-device graphics test has been integrated.
+Status: **interface contract and preflight validation implemented; no production renderer integrated**. Hineka now defines a backend protocol and rejects native artifacts that are not checksum-verified iOS arm64 Mach-O binaries. No patched LWJGL native, SDL bridge, game JVM supervisor, or physical-device graphics test has been integrated.
 
 ## Why this is a separate subsystem
 
@@ -39,7 +39,7 @@ These are reference implementations, not dependencies selected for Hineka. Licen
 
 - Renderer choice must be tied to the Minecraft/LWJGL generation, not only a global setting.
 - Evaluate GL4ES for older fixed-function OpenGL versions, a MobileGlues/MobileGL GLES path for newer OpenGL profiles, and Zink/MoltenVK as an optional Vulkan translation path.
-- Keep the renderer behind a Hineka-owned provider boundary: capability probe, native library manifest, environment settings, surface configuration, resize, and shutdown.
+- Keep the renderer behind the Hineka-owned `HinekaRendererBackend` provider boundary: capability probe, native library manifest, environment settings, surface configuration, resize, and shutdown. `HinekaRendererManifestValidator` verifies iOS/arm64 Mach-O metadata and SHA-256 before a backend can pass the startup preflight.
 - Do not select any backend until its iOS arm64 artifacts, supported GL version/extensions, shader behavior, memory use, dependencies and license are recorded and tested.
 
 ### 4. Game JVM session supervisor
@@ -69,4 +69,4 @@ Start with one pinned profile rather than claiming every Minecraft version at on
 - No desktop native library is accepted as an iOS artifact; all native artifacts must be arm64 iOS builds and hash-verified.
 - The runtime and each native component have a reviewed license/provenance record.
 - A real device test must cover launch, render, input, audio, stop, crash handling, memory pressure and thermal behavior.
-- The Play button remains disabled until all gates for the selected profile pass.
+- The Play button remains disabled until all gates for the selected profile pass. The current project intentionally has no integrated renderer backend, so the preflight remains blocked.

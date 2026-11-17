@@ -69,7 +69,16 @@ private struct MinecraftLaunchPlanSmokeTests {
         try testSessionMachineFailureAndReset()
         try testSessionMachineRejectsInvalidStart()
         try testSessionMachineRejectsStopWhileIdle()
-        print("Hineka launch-plan, asset, runtime, and session-state tests: 25/25 passed")
+        try testRendererManifestRejectsReferenceOnlyBackend()
+        try testRendererManifestAcceptsVerifiedIOSArm64Backend()
+        try testRendererManifestRejectsChecksumMismatch()
+        try testRendererManifestRejectsNonIOSMachO()
+        try testRendererManifestRejectsUnsupportedJavaMajor()
+        try testRendererManifestRejectsUnsafeArtifactPath()
+        try testPreflightRejectsIncompleteRuntime()
+        try testPreflightPreservesLaunchPlanBlockers()
+        try testPreflightRejectsMissingBackendRegistration()
+        print("Hineka launch-plan, asset, runtime, session, renderer and preflight tests: 34/34 passed")
     }
 
     private static func expect(_ condition: @autoclosure () -> Bool, _ message: String) throws {
@@ -562,6 +571,259 @@ private struct MinecraftLaunchPlanSmokeTests {
         processors=6
         modules=\(modules)
         """
+    }
+
+    private static func testRendererManifestRejectsReferenceOnlyBackend() throws {
+        let fixture = try RendererFixture()
+        defer { fixture.remove() }
+        let artifact = try fixture.writeArtifact(makeIOSArm64MachO())
+        let manifest = fixture.manifest(
+            artifact: artifact,
+            status: .referenceOnly
+        )
+        let backend = TestRendererBackend(manifest: manifest)
+        let result = HinekaRendererManifestValidator.validate(
+            manifest: manifest,
+            backend: backend,
+            rendererDirectory: fixture.root,
+            requiredJavaMajorVersion: 17
+        )
+        try expect(!result.isReady, "A research-only renderer must not pass preflight.")
+        try expect(result.blockers.contains(where: { $0.contains("chưa được tích hợp") }),
+                   "Research-only renderer blocker was not surfaced.")
+    }
+
+    private static func testRendererManifestAcceptsVerifiedIOSArm64Backend() throws {
+        let fixture = try RendererFixture()
+        defer { fixture.remove() }
+        let artifact = try fixture.writeArtifact(makeIOSArm64MachO())
+        let manifest = fixture.manifest(artifact: artifact, status: .integrated)
+        let backend = TestRendererBackend(manifest: manifest)
+        let report = try makeCompleteRuntimeReport(javaMajor: 17)
+        let result = HinekaGameStartupPreflight.evaluate(
+            requiredJavaMajorVersion: 17,
+            runtime: report,
+            rendererManifest: manifest,
+            rendererBackend: backend,
+            rendererDirectory: fixture.root
+        )
+        try expect(result.canStart, "A complete synthetic iOS arm64 renderer setup should pass.")
+    }
+
+    private static func testRendererManifestRejectsChecksumMismatch() throws {
+        let fixture = try RendererFixture()
+        defer { fixture.remove() }
+        let artifact = try fixture.writeArtifact(makeIOSArm64MachO(), overrideSHA256: String(repeating: "0", count: 64))
+        let manifest = fixture.manifest(artifact: artifact, status: .integrated)
+        let backend = TestRendererBackend(manifest: manifest)
+        let result = HinekaRendererManifestValidator.validate(
+            manifest: manifest,
+            backend: backend,
+            rendererDirectory: fixture.root,
+            requiredJavaMajorVersion: 17
+        )
+        try expect(result.blockers.contains(where: { $0.contains("không khớp SHA-256") }),
+                   "Renderer checksum mismatch was not rejected.")
+    }
+
+    private static func testRendererManifestRejectsNonIOSMachO() throws {
+        let fixture = try RendererFixture()
+        defer { fixture.remove() }
+        let artifact = try fixture.writeArtifact(makeIOSArm64MachO(platform: 1))
+        let manifest = fixture.manifest(artifact: artifact, status: .integrated)
+        let backend = TestRendererBackend(manifest: manifest)
+        let result = HinekaRendererManifestValidator.validate(
+            manifest: manifest,
+            backend: backend,
+            rendererDirectory: fixture.root,
+            requiredJavaMajorVersion: 17
+        )
+        try expect(result.blockers.contains(where: { $0.contains("không khai báo nền tảng iOS") }),
+                   "macOS Mach-O was incorrectly accepted as iOS.")
+    }
+
+    private static func testRendererManifestRejectsUnsupportedJavaMajor() throws {
+        let fixture = try RendererFixture()
+        defer { fixture.remove() }
+        let artifact = try fixture.writeArtifact(makeIOSArm64MachO())
+        let manifest = fixture.manifest(artifact: artifact, status: .integrated, supportedJavaMajorVersions: [21])
+        let result = HinekaRendererManifestValidator.validate(
+            manifest: manifest,
+            backend: TestRendererBackend(manifest: manifest),
+            rendererDirectory: fixture.root,
+            requiredJavaMajorVersion: 17
+        )
+        try expect(result.blockers.contains(where: { $0.contains("không khai báo hỗ trợ Java 17") }),
+                   "Unsupported Java major was not rejected.")
+    }
+
+    private static func testRendererManifestRejectsUnsafeArtifactPath() throws {
+        let fixture = try RendererFixture()
+        defer { fixture.remove() }
+        let artifact = HinekaRendererNativeArtifact(
+            relativePath: "../outside.dylib",
+            sha256: String(repeating: "a", count: 64),
+            platform: "ios",
+            architecture: "arm64"
+        )
+        let manifest = HinekaRendererManifest(
+            identifier: "test-renderer",
+            displayName: "Test Renderer",
+            integrationStatus: .integrated,
+            supportedJavaMajorVersions: [17],
+            artifacts: [artifact]
+        )
+        let result = HinekaRendererManifestValidator.validate(
+            manifest: manifest,
+            backend: TestRendererBackend(manifest: manifest),
+            rendererDirectory: fixture.root,
+            requiredJavaMajorVersion: 17
+        )
+        try expect(result.blockers.contains(where: { $0.contains("Đường dẫn native artifact") }),
+                   "Unsafe native artifact path was not rejected.")
+    }
+
+    private static func testPreflightRejectsIncompleteRuntime() throws {
+        let fixture = try RendererFixture()
+        defer { fixture.remove() }
+        let artifact = try fixture.writeArtifact(makeIOSArm64MachO())
+        let manifest = fixture.manifest(artifact: artifact, status: .integrated)
+        let report = try makeCompleteRuntimeReport(javaMajor: 21, modules: ["java.base", "java.logging"])
+        let result = HinekaGameStartupPreflight.evaluate(
+            requiredJavaMajorVersion: 17,
+            runtime: report,
+            rendererManifest: manifest,
+            rendererBackend: TestRendererBackend(manifest: manifest),
+            rendererDirectory: fixture.root
+        )
+        try expect(!result.canStart, "Runtime mismatch and missing modules must block startup.")
+        try expect(result.blockers.contains(where: { $0.contains("không khớp Java 17") }),
+                   "Java major mismatch was not surfaced.")
+        try expect(result.blockers.contains(where: { $0.contains("thiếu module baseline") }),
+                   "Missing module baseline was not surfaced.")
+    }
+
+    private static func testPreflightPreservesLaunchPlanBlockers() throws {
+        let fixture = try RendererFixture()
+        defer { fixture.remove() }
+        let artifact = try fixture.writeArtifact(makeIOSArm64MachO())
+        let manifest = fixture.manifest(artifact: artifact, status: .integrated)
+        let report = try makeCompleteRuntimeReport(javaMajor: 17)
+        let result = HinekaGameStartupPreflight.evaluate(
+            requiredJavaMajorVersion: 17,
+            runtime: report,
+            rendererManifest: manifest,
+            rendererBackend: TestRendererBackend(manifest: manifest),
+            rendererDirectory: fixture.root,
+            launchPlanBlockers: ["JNI game supervisor chưa được triển khai."]
+        )
+        try expect(!result.canStart, "An incomplete launch plan must block startup.")
+        try expect(result.blockers.contains("JNI game supervisor chưa được triển khai."),
+                   "Launch-plan blockers were not preserved by preflight.")
+    }
+
+    private static func testPreflightRejectsMissingBackendRegistration() throws {
+        let fixture = try RendererFixture()
+        defer { fixture.remove() }
+        let artifact = try fixture.writeArtifact(makeIOSArm64MachO())
+        let manifest = fixture.manifest(artifact: artifact, status: .integrated)
+        let result = HinekaRendererManifestValidator.validate(
+            manifest: manifest,
+            backend: nil,
+            rendererDirectory: fixture.root,
+            requiredJavaMajorVersion: 17
+        )
+        try expect(result.blockers.contains(where: { $0.contains("Chưa đăng ký HinekaRendererBackend") }),
+                   "Missing renderer backend registration was not rejected.")
+    }
+
+    private struct RendererFixture {
+        let root: URL
+
+        init() throws {
+            root = FileManager.default.temporaryDirectory
+                .appendingPathComponent("HinekaRendererTests-\(UUID().uuidString)", isDirectory: true)
+            try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        }
+
+        func writeArtifact(_ data: Data, overrideSHA256: String? = nil) throws -> HinekaRendererNativeArtifact {
+            let file = root.appendingPathComponent("libHinekaRenderer.dylib")
+            try data.write(to: file)
+            let hash = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+            return HinekaRendererNativeArtifact(
+                relativePath: file.lastPathComponent,
+                sha256: overrideSHA256 ?? hash,
+                platform: "ios",
+                architecture: "arm64"
+            )
+        }
+
+        func manifest(
+            artifact: HinekaRendererNativeArtifact,
+            status: HinekaRendererIntegrationStatus,
+            supportedJavaMajorVersions: Set<Int> = [17]
+        ) -> HinekaRendererManifest {
+            HinekaRendererManifest(
+                identifier: "test-renderer",
+                displayName: "Test Renderer",
+                integrationStatus: status,
+                supportedJavaMajorVersions: supportedJavaMajorVersions,
+                artifacts: [artifact]
+            )
+        }
+
+        func remove() {
+            try? FileManager.default.removeItem(at: root)
+        }
+    }
+
+    private struct TestRendererBackend: HinekaRendererBackend {
+        let manifest: HinekaRendererManifest
+        func prepare(configuration: HinekaRendererLaunchConfiguration) throws {}
+        func resize(width: Int, height: Int) throws {}
+        func shutdown() throws {}
+    }
+
+    private static func makeCompleteRuntimeReport(
+        javaMajor: Int,
+        modules: Set<String> = HinekaJavaRuntimeReport.minecraftBaselineModules
+    ) throws -> HinekaJavaRuntimeReport {
+        let output = runtimeReport(
+            javaVersion: "\(javaMajor).0.1",
+            javaMajor: String(javaMajor),
+            vmName: "OpenJDK 64-Bit Zero VM",
+            architecture: "aarch64",
+            modules: modules.sorted().joined(separator: ",")
+        )
+        return try HinekaJavaRuntimeReport.parse(output)
+    }
+
+    private static func makeIOSArm64MachO(
+        platform: UInt32 = 2,
+        cpuType: UInt32 = 0x0100000c
+    ) -> Data {
+        var data = Data()
+        func append(_ value: UInt32) {
+            data.append(UInt8(value & 0xff))
+            data.append(UInt8((value >> 8) & 0xff))
+            data.append(UInt8((value >> 16) & 0xff))
+            data.append(UInt8((value >> 24) & 0xff))
+        }
+        append(0xfeedfacf) // MH_MAGIC_64
+        append(cpuType)    // CPU_TYPE_ARM64
+        append(0)          // cpusubtype
+        append(6)          // MH_DYLIB
+        append(1)          // ncmds
+        append(24)         // sizeofcmds
+        append(0)          // flags
+        append(0)          // reserved
+        append(0x32)       // LC_BUILD_VERSION
+        append(24)         // cmdsize
+        append(platform)   // PLATFORM_IOS = 2
+        append(0x00120000) // min OS
+        append(0x00120000) // SDK
+        append(0)          // ntools
+        return data
     }
 
     private static func testSessionMachineHappyPath() throws {
