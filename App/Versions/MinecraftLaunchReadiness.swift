@@ -194,11 +194,11 @@ public enum MinecraftLaunchReadinessChecker {
     }
 
     private static func fileMatches(_ url: URL, sha1: String?, size: Int64?) -> Bool {
-        guard let sha1, isSHA1(sha1), let size, size >= 0 else { return false }
+        guard let sha1, isSHA1(sha1), size == nil || size! >= 0 else { return false }
         guard
             let attributes = try? FileManager.default.attributesOfItem(atPath: url.path),
             let actualSize = (attributes[.size] as? NSNumber)?.int64Value,
-            actualSize == size,
+            (size == nil || actualSize == size),
             let data = try? Data(contentsOf: url)
         else {
             return false
