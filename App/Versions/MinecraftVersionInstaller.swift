@@ -212,7 +212,7 @@ public final class MinecraftVersionInstaller: ObservableObject {
             let estimatedBytes = try Self.checkedTotalSize(
                 artifactSizes + [assetIndexSize ?? 0, totalAssetSize]
             )
-            try Self.requireAvailableSpace(
+            try requireAvailableSpace(
                 in: appMinecraftDirectory(),
                 estimatedBytes: estimatedBytes
             )
