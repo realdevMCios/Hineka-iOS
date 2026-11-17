@@ -47,19 +47,54 @@ public final class HinekaLocalLibraryStore: ObservableObject {
 
     private let fileManager = FileManager.default
     private let maximumFileSize: Int64 = 250 * 1024 * 1024
+    private let storageRootOverride: URL?
 
-    public init() {
+    /// The optional root is the Hineka data directory itself and is used by isolated tests.
+    public init(storageRoot: URL? = nil) {
+        self.storageRootOverride = storageRoot
         reload()
     }
 
     public func reload() {
-        guard let manifestURL = try? manifestURL(),
-              let data = try? Data(contentsOf: manifestURL),
-              let decoded = try? JSONDecoder().decode([HinekaLocalFile].self, from: data) else {
+        guard
+            let root = try? storageRootDirectory(),
+            let manifestURL = try? root.appendingPathComponent("local-library.json", isDirectory: false),
+            let data = try? Data(contentsOf: manifestURL),
+            let decoded = try? JSONDecoder().decode([HinekaLocalFile].self, from: data)
+        else {
             files = []
             return
         }
-        files = decoded.sorted { $0.importedAt > $1.importedAt }
+
+        // A local manifest is data, not authority to construct arbitrary file paths.
+        // Only retain generated UUID filenames whose files still exist as regular files.
+        files = decoded.filter { item in
+            guard Self.isSafeStoredFileName(item.storedFileName, for: item.kind) else {
+                return false
+            }
+
+            let fileURL = root
+                .appendingPathComponent(item.kind.folderName, isDirectory: true)
+                .appendingPathComponent(item.storedFileName, isDirectory: false)
+
+            guard
+                let values = try? fileURL.resourceValues(forKeys: [
+                    .fileSizeKey,
+                    .isRegularFileKey,
+                    .isSymbolicLinkKey
+                ]),
+                values.isRegularFile == true,
+                values.isSymbolicLink != true,
+                let actualSize = values.fileSize,
+                item.byteCount >= 0,
+                Int64(actualSize) == item.byteCount
+            else {
+                return false
+            }
+
+            return true
+        }
+        .sorted { $0.importedAt > $1.importedAt }
     }
 
     @discardableResult
@@ -100,10 +135,20 @@ public final class HinekaLocalLibraryStore: ObservableObject {
             try fileManager.copyItem(at: sourceURL, to: destinationURL)
 
             do {
-                let copiedValues = try destinationURL.resourceValues(forKeys: [.fileSizeKey])
-                guard copiedValues.fileSize == fileSize else {
+                // Re-check the copied file, not only the security-scoped source URL.
+                let copiedValues = try destinationURL.resourceValues(forKeys: [
+                    .fileSizeKey,
+                    .isRegularFileKey,
+                    .isSymbolicLinkKey
+                ])
+                guard
+                    copiedValues.isRegularFile == true,
+                    copiedValues.isSymbolicLink != true,
+                    copiedValues.fileSize == fileSize
+                else {
                     throw HinekaLocalLibraryError.copySizeMismatch
                 }
+                try Self.validateZIPSignature(at: destinationURL)
             } catch {
                 try? fileManager.removeItem(at: destinationURL)
                 throw error
@@ -139,15 +184,47 @@ public final class HinekaLocalLibraryStore: ObservableObject {
     }
 
     public func delete(_ item: HinekaLocalFile) throws {
-        let folder = try directory(for: item.kind)
-        let fileURL = folder.appendingPathComponent(item.storedFileName, isDirectory: false)
+        guard Self.isSafeStoredFileName(item.storedFileName, for: item.kind) else {
+            throw HinekaLocalLibraryError.invalidStoredFileName
+        }
+        guard let existing = files.first(where: { $0.id == item.id }),
+              existing.kind == item.kind,
+              existing.storedFileName == item.storedFileName else {
+            throw HinekaLocalLibraryError.itemNotFound
+        }
+
+        let folder = try directory(for: existing.kind)
+        let fileURL = folder.appendingPathComponent(existing.storedFileName, isDirectory: false)
 
         if fileManager.fileExists(atPath: fileURL.path) {
             try fileManager.removeItem(at: fileURL)
         }
 
-        files.removeAll { $0.id == item.id }
+        files.removeAll { $0.id == existing.id }
         try saveManifest()
+    }
+
+    private static func isSafeStoredFileName(
+        _ storedFileName: String,
+        for kind: HinekaLocalFileKind
+    ) -> Bool {
+        guard
+            !storedFileName.isEmpty,
+            !storedFileName.contains("/"),
+            !storedFileName.contains("\\"),
+            URL(fileURLWithPath: storedFileName).lastPathComponent == storedFileName,
+            URL(fileURLWithPath: storedFileName).pathExtension.lowercased() == kind.expectedExtension
+        else {
+            return false
+        }
+
+        let stem = URL(fileURLWithPath: storedFileName)
+            .deletingPathExtension()
+            .lastPathComponent
+        guard let parsedID = UUID(uuidString: stem) else {
+            return false
+        }
+        return parsedID.uuidString.caseInsensitiveCompare(stem) == .orderedSame
     }
 
     private static func validateZIPSignature(at url: URL) throws {
@@ -170,31 +247,34 @@ public final class HinekaLocalLibraryStore: ObservableObject {
             throw HinekaLocalLibraryError.invalidArchiveSignature
         }
     }
-    private func directory(for kind: HinekaLocalFileKind) throws -> URL {
-        guard let support = fileManager.urls(
-            for: .applicationSupportDirectory,
-            in: .userDomainMask
-        ).first else {
-            throw HinekaLocalLibraryError.storageUnavailable
+    private func storageRootDirectory() throws -> URL {
+        let root: URL
+        if let storageRootOverride {
+            root = storageRootOverride
+        } else {
+            guard let support = fileManager.urls(
+                for: .applicationSupportDirectory,
+                in: .userDomainMask
+            ).first else {
+                throw HinekaLocalLibraryError.storageUnavailable
+            }
+            root = support.appendingPathComponent("Hineka", isDirectory: true)
         }
 
-        let root = support.appendingPathComponent("Hineka", isDirectory: true)
-        let folder = root.appendingPathComponent(kind.folderName, isDirectory: true)
+        try fileManager.createDirectory(at: root, withIntermediateDirectories: true)
+        return root
+    }
+
+    private func directory(for kind: HinekaLocalFileKind) throws -> URL {
+        let folder = try storageRootDirectory()
+            .appendingPathComponent(kind.folderName, isDirectory: true)
         try fileManager.createDirectory(at: folder, withIntermediateDirectories: true)
         return folder
     }
 
     private func manifestURL() throws -> URL {
-        guard let support = fileManager.urls(
-            for: .applicationSupportDirectory,
-            in: .userDomainMask
-        ).first else {
-            throw HinekaLocalLibraryError.storageUnavailable
-        }
-
-        let root = support.appendingPathComponent("Hineka", isDirectory: true)
-        try fileManager.createDirectory(at: root, withIntermediateDirectories: true)
-        return root.appendingPathComponent("local-library.json", isDirectory: false)
+        try storageRootDirectory()
+            .appendingPathComponent("local-library.json", isDirectory: false)
     }
 
     private func saveManifest() throws {
@@ -213,6 +293,8 @@ public enum HinekaLocalLibraryError: LocalizedError {
     case invalidArchiveSignature
     case fileTooLarge
     case copySizeMismatch
+    case invalidStoredFileName
+    case itemNotFound
     case storageUnavailable
 
     public var errorDescription: String? {
@@ -229,6 +311,10 @@ public enum HinekaLocalLibraryError: LocalizedError {
             return "Tệp vượt quá giới hạn 250 MB."
         case .copySizeMismatch:
             return "Dung lượng tệp sau khi sao chép không khớp tệp gốc."
+        case .invalidStoredFileName:
+            return "Tên tệp lưu nội bộ không hợp lệ."
+        case .itemNotFound:
+            return "Không tìm thấy mục thư viện tương ứng."
         case .storageUnavailable:
             return "Không thể truy cập vùng lưu trữ của Hineka."
         }
