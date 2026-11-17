@@ -153,8 +153,13 @@ public enum MinecraftLaunchReadinessChecker {
         }
 
         var blockers: [String] = []
-        if !fileManager.fileExists(atPath: clientURL.path) {
-            blockers.append("Thiếu Minecraft client JAR.")
+        let clientJarIsValid = fileMatches(
+            clientURL,
+            sha1: metadata.downloads.client?.sha1,
+            size: metadata.downloads.client?.size
+        )
+        if !clientJarIsValid {
+            blockers.append("Minecraft client JAR bị thiếu hoặc không khớp SHA-1/dung lượng.")
         }
         if missingLibraryCount > 0 {
             blockers.append("Thiếu \(missingLibraryCount) thư viện Java.")
@@ -177,7 +182,7 @@ public enum MinecraftLaunchReadinessChecker {
             versionID: versionID,
             javaMajorVersion: metadata.javaVersion?.majorVersion,
             mainClass: metadata.mainClass,
-            clientJarExists: fileManager.fileExists(atPath: clientURL.path),
+            clientJarExists: clientJarIsValid,
             assetIndexExists: assetIndexExists,
             libraryCount: libraryCount,
             missingLibraryCount: missingLibraryCount,
