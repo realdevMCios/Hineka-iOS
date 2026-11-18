@@ -87,7 +87,7 @@ private struct MinecraftLaunchPlanSmokeTests {
 
     private static func testStreamingSHA1FileVerifier() throws {
         let file = FileManager.default.temporaryDirectory
-            .appendingPathComponent("HinekaSHA1Streaming-\\(UUID().uuidString)")
+            .appendingPathComponent("HinekaSHA1Streaming-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: file) }
 
         let payload = Data((0..<(3 * 1024 * 1024 + 37)).map { UInt8($0 & 0xff) })
