@@ -1,5 +1,4 @@
 import Foundation
-import CryptoKit
 
 public struct HinekaLaunchReadiness: Identifiable {
     public var id: String { versionID }
@@ -200,18 +199,14 @@ public enum MinecraftLaunchReadinessChecker {
 
         guard
             let attributes = try? FileManager.default.attributesOfItem(atPath: url.path),
-            let actualSize = (attributes[.size] as? NSNumber)?.int64Value,
-            let data = try? Data(contentsOf: url)
+            let actualSize = (attributes[.size] as? NSNumber)?.int64Value
         else {
             return false
         }
 
         if let size, actualSize != size { return false }
 
-        return Insecure.SHA1.hash(data: data)
-            .map { String(format: "%02x", $0) }
-            .joined()
-            .caseInsensitiveCompare(sha1) == .orderedSame
+        return (try? HinekaSHA1FileVerifier.matches(fileAt: url, expectedSHA1: sha1)) == true
     }
 
     private static func isSafeIdentifier(_ value: String) -> Bool {
