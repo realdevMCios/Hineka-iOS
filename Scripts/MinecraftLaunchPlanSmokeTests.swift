@@ -44,6 +44,7 @@ private struct LaunchPlanFixture {
 @main
 private struct MinecraftLaunchPlanSmokeTests {
     static func main() throws {
+        try testStreamingSHA1FileVerifier()
         try testOfflineIdentityValidation()
         try testModernArgumentsAndClasspath()
         try testIOSRuleFilteringIsTheDefault()
@@ -81,7 +82,39 @@ private struct MinecraftLaunchPlanSmokeTests {
         try testPreflightRejectsIncompleteRuntime()
         try testPreflightPreservesLaunchPlanBlockers()
         try testPreflightRejectsMissingBackendRegistration()
-        print("Hineka launch-plan, asset, runtime, gated session, renderer and preflight tests: 37/37 passed")
+        print("Hineka launch-plan, asset, runtime, gated session, renderer, preflight and file-integrity tests: 38/38 passed")
+    }
+
+    private static func testStreamingSHA1FileVerifier() throws {
+        let file = FileManager.default.temporaryDirectory
+            .appendingPathComponent("HinekaSHA1Streaming-\\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: file) }
+
+        let payload = Data((0..<(3 * 1024 * 1024 + 37)).map { UInt8($0 & 0xff) })
+        try payload.write(to: file)
+        let expected = Insecure.SHA1.hash(data: payload)
+            .map { String(format: "%02x", $0) }
+            .joined()
+
+        let valid = try HinekaSHA1FileVerifier.matches(
+            fileAt: file,
+            expectedSHA1: expected,
+            chunkSize: 64 * 1024
+        )
+        try expect(valid, "Streaming SHA-1 rejected a valid multi-chunk file.")
+
+        let invalid = try HinekaSHA1FileVerifier.matches(
+            fileAt: file,
+            expectedSHA1: String(repeating: "0", count: 40),
+            chunkSize: 64 * 1024
+        )
+        try expect(!invalid, "Streaming SHA-1 accepted an incorrect digest.")
+
+        let malformed = try HinekaSHA1FileVerifier.matches(
+            fileAt: file,
+            expectedSHA1: "not-a-sha1"
+        )
+        try expect(!malformed, "Streaming SHA-1 accepted malformed hash metadata.")
     }
 
     private static func expect(_ condition: @autoclosure () -> Bool, _ message: String) throws {
