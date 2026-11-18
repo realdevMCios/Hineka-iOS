@@ -19,6 +19,39 @@ struct MinecraftVersionInstallerError: LocalizedError {
     static let invalidMetadataSize = Self(message: "Metadata chứa dung lượng tệp không hợp lệ hoặc vượt giới hạn tính toán.")
 }
 
+
+/// Verifies SHA-1 incrementally so large client JARs and asset files do not need
+/// to be loaded into memory as one Data value.
+enum HinekaSHA1FileVerifier {
+    static func matches(
+        fileAt url: URL,
+        expectedSHA1: String,
+        chunkSize: Int = 1024 * 1024
+    ) throws -> Bool {
+        guard expectedSHA1.count == 40,
+              expectedSHA1.allSatisfy({ $0.isHexDigit }),
+              chunkSize > 0 else {
+            return false
+        }
+
+        let handle = try FileHandle(forReadingFrom: url)
+        defer { try? handle.close() }
+
+        var hasher = Insecure.SHA1()
+        while true {
+            guard let chunk = try handle.read(upToCount: chunkSize), !chunk.isEmpty else {
+                break
+            }
+            hasher.update(data: chunk)
+        }
+
+        let actual = hasher.finalize()
+            .map { String(format: "%02x", $0) }
+            .joined()
+        return actual.caseInsensitiveCompare(expectedSHA1) == .orderedSame
+    }
+}
+
 struct MinecraftVersionMetadata: Decodable {
     struct VerifiedDownload: Decodable {
         let sha1: String?
@@ -316,15 +349,11 @@ enum MinecraftAssetCompatibilityStager {
             let attributes = try? fileManager.attributesOfItem(atPath: url.path),
             attributes[.type] as? FileAttributeType == .typeRegular,
             let actualSize = (attributes[.size] as? NSNumber)?.int64Value,
-            actualSize == size,
-            let data = try? Data(contentsOf: url, options: [.mappedIfSafe])
+            actualSize == size
         else {
             return false
         }
-        let actualSHA1 = Insecure.SHA1.hash(data: data)
-            .map { String(format: "%02x", $0) }
-            .joined()
-        return actualSHA1.caseInsensitiveCompare(sha1) == .orderedSame
+        return (try? HinekaSHA1FileVerifier.matches(fileAt: url, expectedSHA1: sha1)) == true
     }
 
     private static func isSHA1(_ value: String) -> Bool {
@@ -663,9 +692,9 @@ public final class MinecraftVersionInstaller: ObservableObject {
         if FileManager.default.fileExists(atPath: destination.path) {
             let attributes = try FileManager.default.attributesOfItem(atPath: destination.path)
             let existingSize = (attributes[.size] as? NSNumber)?.int64Value
-            if existingSize == expectedSize {
-                let existing = try Data(contentsOf: destination)
-                if sha1Matches(existing, expected: sha1) { return }
+            if existingSize == expectedSize,
+               (try? HinekaSHA1FileVerifier.matches(fileAt: destination, expectedSHA1: sha1)) == true {
+                return
             }
         }
 
@@ -688,8 +717,9 @@ public final class MinecraftVersionInstaller: ObservableObject {
             throw MinecraftVersionInstallerError.sizeMismatch
         }
 
-        let data = try Data(contentsOf: temporaryURL)
-        try verify(data: data, expectedSHA1: sha1)
+        guard try HinekaSHA1FileVerifier.matches(fileAt: temporaryURL, expectedSHA1: sha1) else {
+            throw MinecraftVersionInstallerError.checksumMismatch
+        }
 
         let parent = destination.deletingLastPathComponent()
         try FileManager.default.createDirectory(at: parent, withIntermediateDirectories: true)
